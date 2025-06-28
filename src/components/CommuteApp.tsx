@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Animated, Dimensions, Platform } from 'react-native';
 import { RealMTAService, Route } from '../services/RealMTAService';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 const COMMUTE_DATA = {
   home: '42 Woodhull St, Brooklyn',
@@ -44,40 +46,49 @@ interface RouteCardProps {
 
 function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps) {
   const [animation] = useState(new Animated.Value(0));
-  
-  // Debug logging for final walking step
-  console.log(`[DEBUG RouteCard] Route ${route.id} final walking data:`, {
-    finalWalkingTime: route.finalWalkingTime,
-    walkingDistance: route.walkingDistance,
-    endingStation: route.endingStation,
-    shouldShowFinalWalk: !!(route.walkingDistance || route.finalWalkingTime)
-  });
+  const [scaleAnimation] = useState(new Animated.Value(1));
   
   useEffect(() => {
-    Animated.timing(animation, {
+    Animated.spring(animation, {
       toValue: isExpanded ? 1 : 0,
-      duration: 300,
       useNativeDriver: false,
+      tension: 100,
+      friction: 8,
     }).start();
   }, [isExpanded]);
 
+  const handlePressIn = () => {
+    Animated.spring(scaleAnimation, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 20,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnimation, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 20,
+    }).start();
+  };
+
   const getSubwayLineFromMethod = (method: string): string => {
-    // Handle transfer routes (e.g., "F→A trains + Walk")
     if (method.includes('→')) {
       const match = method.match(/^([A-Z0-9→]+)\s+trains/);
       return match ? match[1] : '';
     }
-    // Handle single routes (e.g., "F train + Walk")
     const match = method.match(/^([A-Z0-9]+)\s+train/);
     return match ? match[1] : '';
   };
 
   const getSubwayColor = (line: string): string => {
-    return SUBWAY_COLORS[line] || '#666';
+    return SUBWAY_COLORS[line] || '#007AFF';
   };
 
   const getCountdownMinutes = (): number => {
-    // Calculate minutes until departure (simplified)
     const now = new Date();
     const [time, period] = route.arrivalTime.split(' ');
     const [hours, minutes] = time.split(':').map(Number);
@@ -89,7 +100,6 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
     const arrivalTime = new Date();
     arrivalTime.setHours(hour24, minutes, 0, 0);
     
-    // Subtract total journey time to get departure time
     const totalMinutes = parseInt(route.duration.replace(' min', ''));
     const departureTime = new Date(arrivalTime.getTime() - totalMinutes * 60000);
     
@@ -101,229 +111,194 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
   const subwayColor = getSubwayColor(subwayLine);
   const countdownMinutes = getCountdownMinutes();
 
+  const expandedHeight = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 500],
+  });
+
+  const expandedOpacity = animation.interpolate({
+    inputRange: [0, 0.3, 1],
+    outputRange: [0, 0, 1],
+  });
+
   return (
-    <TouchableOpacity 
-      style={[
-        styles.routeCard,
-        isBestRoute && styles.bestRouteCard,
-        { shadowColor: subwayColor }
-      ]}
-      onPress={onToggle}
-      activeOpacity={0.7}
-    >
-      {/* Main Route Info */}
-      <View style={styles.routeHeader}>
-        <View style={styles.routeMainInfo}>
-          {subwayLine && (
-            <View style={[styles.subwayIcon, { backgroundColor: subwayColor }]}>
-              <Text style={styles.subwayIconText}>{subwayLine}</Text>
-            </View>
-          )}
-          <View style={styles.routeTextInfo}>
-            <Text style={styles.routeTitle}>
-              {route.method.replace(' + Walk', '')}
-            </Text>
-            <Text style={styles.routeSubtitle}>
-              {(route.transfers ?? 0) === 0 ? 'Direct' : `${route.transfers} transfer${(route.transfers ?? 0) > 1 ? 's' : ''}`}
-            </Text>
-          </View>
-        </View>
-        
-        <View style={styles.routeTimeInfo}>
-          <Text style={styles.arrivalTime}>{route.arrivalTime}</Text>
-          <Text style={styles.totalDuration}>{route.duration}</Text>
-          {route.isRealTimeData && (
-            <View style={styles.liveIndicator}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveText}>LIVE</Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* Countdown Timer */}
-      <View style={styles.countdownContainer}>
-        <Text style={styles.countdownText}>
-          {countdownMinutes > 0 ? `Departs in ${countdownMinutes}m` : 'Departing now'}
-        </Text>
-        <View style={[styles.countdownBar, { backgroundColor: subwayColor + '20' }]}>
-          <View 
-            style={[
-              styles.countdownProgress, 
-              { 
-                backgroundColor: subwayColor,
-                width: `${Math.max(10, Math.min(100, (30 - countdownMinutes) / 30 * 100))}%`
-              }
-            ]} 
-          />
-        </View>
-      </View>
-
-      {/* Expandable Details */}
-      <Animated.View
+    <Animated.View style={[{ transform: [{ scale: scaleAnimation }] }]}>
+      <TouchableOpacity 
         style={[
-          styles.expandableContent,
-          {
-            maxHeight: animation.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, 400], // Increased from 200 to 400
-            }),
-            opacity: animation,
-          },
+          styles.routeCard,
+          isBestRoute && styles.bestRouteCard,
+          { 
+            shadowColor: subwayColor,
+            backgroundColor: 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(20px)',
+          }
         ]}
+        onPress={onToggle}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
       >
-        <View style={styles.routeSteps}>
-          <Text style={styles.stepsTitle}>Step-by-step directions:</Text>
-          
-          {/* Walking Step */}
-          <View style={styles.step}>
-            <View style={styles.stepIcon}>
-              <Text style={styles.stepIconText}>🚶</Text>
-            </View>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepText}>
-                Walk {route.walkingToTransit} min to {subwayLine} train at <Text style={styles.stationName}>{route.startingStation}</Text>
+        {/* Glassmorphism overlay */}
+        <View style={styles.glassOverlay} />
+        
+        {/* Best route indicator */}
+        {isBestRoute && (
+          <View style={[styles.bestRouteBadge, { backgroundColor: subwayColor }]}>
+            <Text style={styles.bestRouteText}>FASTEST</Text>
+          </View>
+        )}
+
+        {/* Main Route Info */}
+        <View style={styles.routeHeader}>
+          <View style={styles.routeMainInfo}>
+            {subwayLine && (
+              <View style={[styles.subwayIcon, { backgroundColor: subwayColor }]}>
+                <Text style={styles.subwayIconText}>{subwayLine}</Text>
+              </View>
+            )}
+            <View style={styles.routeTextInfo}>
+              <Text style={styles.routeTitle}>
+                {route.method.replace(' + Walk', '')}
               </Text>
-              <Text style={styles.stepTime}>{route.walkingToTransit} min</Text>
+              <Text style={styles.routeSubtitle}>
+                {(route.transfers ?? 0) === 0 ? 'Direct route' : `${route.transfers} transfer${(route.transfers ?? 0) > 1 ? 's' : ''}`}
+              </Text>
             </View>
           </View>
+          
+          <View style={styles.routeTimeInfo}>
+            <Text style={styles.arrivalTime}>{route.arrivalTime}</Text>
+            <Text style={styles.totalDuration}>{route.duration}</Text>
+            {route.isRealTimeData && (
+              <View style={styles.liveIndicator}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>LIVE</Text>
+              </View>
+            )}
+          </View>
+        </View>
 
-          {/* Wait Step */}
-          {route.waitTime && route.waitTime > 0 && (
+        {/* Countdown Timer */}
+        <View style={styles.countdownContainer}>
+          <Text style={[styles.countdownText, { color: subwayColor }]}>
+            {countdownMinutes > 0 ? `Departs in ${countdownMinutes}m` : 'Departing now'}
+          </Text>
+          <View style={[styles.countdownBar, { backgroundColor: `${subwayColor}15` }]}>
+            <Animated.View 
+              style={[
+                styles.countdownProgress, 
+                { 
+                  backgroundColor: subwayColor,
+                  width: `${Math.max(10, Math.min(100, (30 - countdownMinutes) / 30 * 100))}%`
+                }
+              ]} 
+            />
+          </View>
+        </View>
+
+        {/* Expandable Details */}
+        <Animated.View
+          style={[
+            styles.expandableContent,
+            {
+              height: expandedHeight,
+              opacity: expandedOpacity,
+            },
+          ]}
+        >
+          <View style={styles.routeSteps}>
+            <Text style={styles.stepsTitle}>Journey Details</Text>
+            
+            {/* Walking Step */}
             <View style={styles.step}>
-              <View style={[styles.stepIcon, styles.waitIcon]}>
-                <Text style={styles.stepIconText}>⏱️</Text>
+              <View style={[styles.stepIcon, styles.walkIcon]}>
+                <Text style={styles.stepIconText}>🚶‍♂️</Text>
               </View>
               <View style={styles.stepContent}>
                 <Text style={styles.stepText}>
-                  Wait for next {subwayLine} train at <Text style={styles.stationName}>{route.startingStation}</Text>
+                  Walk to <Text style={[styles.stationName, { color: subwayColor }]}>{route.startingStation}</Text>
                 </Text>
-                <Text style={[styles.stepTime, styles.waitTime]}>
-                  {route.waitTime} min wait
-                </Text>
+                <Text style={styles.stepTime}>{route.walkingToTransit}m</Text>
               </View>
             </View>
-          )}
 
-          {/* Transit Step(s) - Handle transfers */}
-          {route.transfers === 0 ? (
-            // Direct route
+            {/* Wait Step */}
+            {route.waitTime && route.waitTime > 0 && (
+              <View style={styles.step}>
+                <View style={[styles.stepIcon, styles.waitIcon]}>
+                  <Text style={styles.stepIconText}>⏱</Text>
+                </View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepText}>
+                    Wait for {subwayLine} train
+                  </Text>
+                  <Text style={[styles.stepTime, { color: '#FF6B35' }]}>
+                    {route.waitTime}m
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Transit Step */}
             <View style={styles.step}>
               <View style={[styles.stepIcon, { backgroundColor: subwayColor }]}>
-                <Text style={[styles.stepIconText, { color: '#fff' }]}>{subwayLine}</Text>
+                <Text style={[styles.stepIconText, { color: '#fff', fontSize: 14, fontWeight: '700' }]}>{subwayLine}</Text>
               </View>
               <View style={styles.stepContent}>
                 <Text style={styles.stepText}>
-                  Take {subwayLine} train from <Text style={styles.stationName}>{route.startingStation}</Text> to <Text style={styles.stationName}>{route.endingStation}</Text>
+                  {subwayLine} train to <Text style={[styles.stationName, { color: subwayColor }]}>{route.endingStation}</Text>
                 </Text>
                 <Text style={styles.stepTime}>
-                  {parseInt(route.duration.replace(' min', '')) - (route.walkingToTransit || 0) - (route.waitTime || 0) - (route.finalWalkingTime || 0)} min
+                  {parseInt(route.duration.replace(' min', '')) - (route.walkingToTransit || 0) - (route.waitTime || 0) - (route.finalWalkingTime || 0)}m
                 </Text>
               </View>
             </View>
-          ) : (
-            // Transfer route - parse the details to show multiple steps
-            <>
-              {subwayLine.includes('→') && (() => {
-                const [firstLine, secondLine] = subwayLine.split('→');
-                const transferMatch = route.details.match(/transfer at ([^,]+) to/);
-                const transferStation = transferMatch ? transferMatch[1] : 'Transfer Station';
-                
-                return (
-                  <>
-                    {/* First train segment */}
-                    <View style={styles.step}>
-                      <View style={[styles.stepIcon, { backgroundColor: SUBWAY_COLORS[firstLine] || '#666' }]}>
-                        <Text style={[styles.stepIconText, { color: '#fff' }]}>{firstLine}</Text>
-                      </View>
-                      <View style={styles.stepContent}>
-                        <Text style={styles.stepText}>
-                          Take {firstLine} train from <Text style={styles.stationName}>{route.startingStation}</Text> to <Text style={styles.stationName}>{transferStation}</Text>
-                        </Text>
-                        <Text style={styles.stepTime}>~12 min</Text>
-                      </View>
-                    </View>
-                    
-                    {/* Transfer step */}
-                    <View style={styles.step}>
-                      <View style={[styles.stepIcon, styles.transferIcon]}>
-                        <Text style={styles.stepIconText}>🔄</Text>
-                      </View>
-                      <View style={styles.stepContent}>
-                        <Text style={styles.stepText}>
-                          Transfer at <Text style={styles.stationName}>{transferStation}</Text>
-                        </Text>
-                        <Text style={[styles.stepTime, styles.transferTime]}>
-                          3-5 min transfer
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    {/* Second train segment */}
-                    <View style={styles.step}>
-                      <View style={[styles.stepIcon, { backgroundColor: SUBWAY_COLORS[secondLine] || '#666' }]}>
-                        <Text style={[styles.stepIconText, { color: '#fff' }]}>{secondLine}</Text>
-                      </View>
-                      <View style={styles.stepContent}>
-                        <Text style={styles.stepText}>
-                          Take {secondLine} train from <Text style={styles.stationName}>{transferStation}</Text> to <Text style={styles.stationName}>{route.endingStation}</Text>
-                        </Text>
-                        <Text style={styles.stepTime}>~10 min</Text>
-                      </View>
-                    </View>
-                  </>
-                );
-              })()}
-            </>
-          )}
 
-          {/* Train Departure Info */}
-          {route.nextTrainDeparture && (
-            <View style={styles.trainInfo}>
-              <Text style={styles.trainInfoText}>
-                Next {subwayLine} train departs: <Text style={styles.departureTime}>{route.nextTrainDeparture}</Text>
-              </Text>
-            </View>
-          )}
+            {/* Final Walking Step */}
+            {(route.walkingDistance || route.finalWalkingTime) && (
+              <View style={styles.step}>
+                <View style={[styles.stepIcon, styles.walkIcon]}>
+                  <Text style={styles.stepIconText}>🚶‍♂️</Text>
+                </View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepText}>
+                    Walk to destination
+                  </Text>
+                  <Text style={styles.stepTime}>
+                    {route.finalWalkingTime ? `${route.finalWalkingTime}m` : route.walkingDistance}
+                  </Text>
+                </View>
+              </View>
+            )}
 
-          {/* Final Walking Step */}
-          {(route.walkingDistance || route.finalWalkingTime) && (
-            <View style={styles.step}>
-              <View style={styles.stepIcon}>
-                <Text style={styles.stepIconText}>🚶</Text>
-              </View>
-              <View style={styles.stepContent}>
-                <Text style={styles.stepText}>
-                  Walk to destination from <Text style={styles.stationName}>{route.endingStation}</Text>
-                </Text>
-                <Text style={styles.stepTime}>
-                  {route.finalWalkingTime ? `${route.finalWalkingTime} min` : route.walkingDistance}
+            {/* Train Departure Info */}
+            {route.nextTrainDeparture && (
+              <View style={styles.trainInfo}>
+                <Text style={styles.trainInfoText}>
+                  Next departure: <Text style={[styles.departureTime, { color: subwayColor }]}>{route.nextTrainDeparture}</Text>
                 </Text>
               </View>
-            </View>
-          )}
+            )}
+          </View>
+        </Animated.View>
+
+        {/* Expand/Collapse Indicator */}
+        <View style={styles.expandIndicator}>
+          <Animated.View
+            style={{
+              transform: [{
+                rotate: animation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '180deg'],
+                })
+              }]
+            }}
+          >
+            <Text style={[styles.expandArrow, { color: subwayColor }]}>▼</Text>
+          </Animated.View>
         </View>
-
-        {/* Confidence & Additional Info */}
-        <View style={styles.additionalInfo}>
-          {route.confidence && (
-            <Text style={styles.confidenceText}>
-              Confidence: {route.confidence}
-            </Text>
-          )}
-        </View>
-      </Animated.View>
-
-      {/* Expand/Collapse Indicator */}
-      <View style={styles.expandIndicator}>
-        <Text style={styles.expandText}>
-          {isExpanded ? 'Less details' : 'More details'}
-        </Text>
-        <Text style={styles.expandArrow}>
-          {isExpanded ? '▲' : '▼'}
-        </Text>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -335,15 +310,24 @@ export function CommuteApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRoutes, setExpandedRoutes] = useState<Set<number>>(new Set());
+  const [headerAnimation] = useState(new Animated.Value(0));
   
   const mtaService = new RealMTAService();
 
   useEffect(() => {
     loadRoutes();
     
+    // Animate header on mount
+    Animated.spring(headerAnimation, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+    
     const interval = setInterval(() => {
       loadRoutes();
-    }, 30000); // Update every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
@@ -351,29 +335,16 @@ export function CommuteApp() {
   const loadRoutes = async () => {
     try {
       setError(null);
-      console.log('[DEBUG UI] Loading routes...');
       const routeData = await mtaService.calculateRoutes(
         COMMUTE_DATA.home,
         COMMUTE_DATA.work,
         COMMUTE_DATA.targetArrival
       );
-      console.log('[DEBUG UI] Received route data:', routeData);
-      console.log('[DEBUG UI] Number of routes:', routeData.length);
-      
-      // Log details about final walking times
-      routeData.forEach((route, index) => {
-        console.log(`[DEBUG UI] Route ${index + 1} (${route.method}):`, {
-          finalWalkingTime: route.finalWalkingTime,
-          walkingDistance: route.walkingDistance,
-          endingStation: route.endingStation,
-          totalDuration: route.duration
-        });
-      });
       
       setRoutes(routeData);
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('[DEBUG UI] Failed to load routes:', error);
+      console.error('Failed to load routes:', error);
       setError(error instanceof Error ? error.message : 'Unable to load MTA data');
       setRoutes([]);
     } finally {
@@ -408,28 +379,49 @@ export function CommuteApp() {
       testID="app-container"
       style={[styles.container, themeStyles.container]}
     >
+      {/* Background gradient */}
+      <View style={[styles.backgroundGradient, themeStyles.backgroundGradient]} />
+      
       {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={[styles.title, themeStyles.text]}>Morning Commute</Text>
-          <Text style={[styles.subtitle, themeStyles.subtitleText]}>
-            {COMMUTE_DATA.home.split(',')[0]} → {COMMUTE_DATA.work.split(',')[0]}
-          </Text>
+      <Animated.View 
+        style={[
+          styles.header,
+          {
+            transform: [
+              {
+                translateY: headerAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-50, 0],
+                })
+              }
+            ],
+            opacity: headerAnimation,
+          }
+        ]}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={[styles.title, themeStyles.text]}>Morning Commute</Text>
+            <Text style={[styles.subtitle, themeStyles.subtitleText]}>
+              {COMMUTE_DATA.home.split(',')[0]} → {COMMUTE_DATA.work.split(',')[0]}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            testID="theme-toggle"
+            onPress={toggleTheme}
+            style={[styles.themeToggle, themeStyles.themeToggle]}
+          >
+            <Text style={styles.themeToggleText}>
+              {isDarkMode ? '☀️' : '🌙'}
+            </Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity 
-          testID="theme-toggle"
-          onPress={toggleTheme}
-          style={[styles.themeToggle, themeStyles.themeToggle]}
-        >
-          <Text style={styles.themeToggleText}>
-            {isDarkMode ? '☀️' : '🌙'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      </Animated.View>
       
       <ScrollView
         testID="scroll-view"
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -437,16 +429,29 @@ export function CommuteApp() {
             onRefresh={onRefresh}
             tintColor="#007AFF"
             colors={['#007AFF']}
+            progressBackgroundColor="rgba(255, 255, 255, 0.9)"
           />
         }
       >
         {/* Status Bar */}
         <View style={[styles.statusBar, themeStyles.statusBar]}>
           <Text style={[styles.statusText, themeStyles.statusText]}>
-            Last updated: {lastUpdated.toLocaleTimeString()}
+            Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
           <View style={styles.liveIndicator}>
-            <View style={styles.liveDot} />
+            <Animated.View 
+              style={[
+                styles.liveDot,
+                {
+                  transform: [{
+                    scale: headerAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 1],
+                    })
+                  }]
+                }
+              ]} 
+            />
             <Text style={styles.liveText}>LIVE</Text>
           </View>
         </View>
@@ -454,9 +459,21 @@ export function CommuteApp() {
         {/* Routes */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={[styles.loading, themeStyles.text]}>
-              Loading real-time MTA data...
-            </Text>
+            <Animated.View
+              style={{
+                transform: [{
+                  scale: headerAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.8, 1],
+                  })
+                }],
+                opacity: headerAnimation,
+              }}
+            >
+              <Text style={[styles.loading, themeStyles.text]}>
+                Loading real-time MTA data...
+              </Text>
+            </Animated.View>
           </View>
         ) : error ? (
           <View style={[styles.errorContainer, themeStyles.errorContainer]}>
@@ -500,9 +517,9 @@ export function CommuteApp() {
         {/* Service Alerts Section */}
         {routes.length > 0 && (
           <View style={[styles.alertsSection, themeStyles.alertsSection]}>
-            <Text style={[styles.alertsTitle, themeStyles.text]}>Service Alerts</Text>
+            <Text style={[styles.alertsTitle, themeStyles.text]}>Service Status</Text>
             <Text style={[styles.alertsMessage, themeStyles.subtitleText]}>
-              No active service alerts for this route
+              All systems operational
             </Text>
           </View>
         )}
@@ -515,50 +532,73 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  backgroundGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   header: {
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 24,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
   },
   title: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
+    lineHeight: 40,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 17,
     marginTop: 4,
     opacity: 0.7,
+    fontWeight: '500',
   },
   themeToggle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   themeToggleText: {
-    fontSize: 20,
+    fontSize: 22,
   },
   scrollView: {
     flex: 1,
-    paddingHorizontal: 20,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
   },
   statusBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    marginBottom: 24,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
   },
   statusText: {
-    fontSize: 14,
+    fontSize: 15,
     opacity: 0.7,
+    fontWeight: '500',
   },
   liveIndicator: {
     flexDirection: 'row',
@@ -568,34 +608,61 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#FF3B30',
-    marginRight: 6,
+    backgroundColor: '#34C759',
+    marginRight: 8,
   },
   liveText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#FF3B30',
+    color: '#34C759',
+    letterSpacing: 0.5,
   },
   routeCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 24,
     marginBottom: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  glassOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backdropFilter: 'blur(20px)',
   },
   bestRouteCard: {
     borderWidth: 2,
     borderColor: '#34C759',
-    shadowOpacity: 0.15,
+    shadowColor: '#34C759',
+    shadowOpacity: 0.2,
+  },
+  bestRouteBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  bestRouteText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   routeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   routeMainInfo: {
     flexDirection: 'row',
@@ -603,91 +670,109 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   subwayIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   subwayIconText: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: '#000',
   },
   routeTextInfo: {
     flex: 1,
   },
   routeTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 4,
+    color: '#000',
   },
   routeSubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     opacity: 0.7,
+    fontWeight: '500',
+    color: '#000',
   },
   routeTimeInfo: {
     alignItems: 'flex-end',
   },
   arrivalTime: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: 4,
+    color: '#000',
   },
   totalDuration: {
-    fontSize: 14,
+    fontSize: 15,
     opacity: 0.7,
-    marginBottom: 4,
+    marginBottom: 8,
+    fontWeight: '500',
+    color: '#000',
   },
   countdownContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   countdownText: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-    color: '#007AFF',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 12,
   },
   countdownBar: {
-    height: 4,
-    borderRadius: 2,
+    height: 6,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   countdownProgress: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: 3,
   },
   expandableContent: {
     overflow: 'hidden',
   },
   routeSteps: {
-    paddingVertical: 16,
+    paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
   stepsTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 20,
+    color: '#000',
   },
   step: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   stepIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    marginRight: 12,
+    marginRight: 16,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  walkIcon: {
+    backgroundColor: '#F2F2F7',
+  },
+  waitIcon: {
+    backgroundColor: '#FFF3CD',
   },
   stepIconText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 16,
   },
   stepContent: {
     flex: 1,
@@ -696,164 +781,154 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   stepText: {
-    fontSize: 14,
+    fontSize: 16,
     flex: 1,
-  },
-  stepTime: {
-    fontSize: 12,
-    opacity: 0.7,
+    color: '#000',
     fontWeight: '500',
   },
-  additionalInfo: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  confidenceText: {
-    fontSize: 12,
+  stepTime: {
+    fontSize: 14,
     opacity: 0.7,
-    fontStyle: 'italic',
+    fontWeight: '600',
+    color: '#000',
+  },
+  stationName: {
+    fontWeight: '600',
+  },
+  trainInfo: {
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  trainInfoText: {
+    fontSize: 14,
+    color: '#000',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  departureTime: {
+    fontWeight: '600',
   },
   expandIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 12,
-  },
-  expandText: {
-    fontSize: 14,
-    color: '#007AFF',
-    marginRight: 6,
+    paddingTop: 16,
   },
   expandArrow: {
-    fontSize: 12,
-    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   loadingContainer: {
-    paddingVertical: 40,
+    paddingVertical: 60,
     alignItems: 'center',
   },
   loading: {
-    fontSize: 16,
+    fontSize: 17,
     opacity: 0.7,
+    fontWeight: '500',
   },
   errorContainer: {
-    backgroundColor: '#fff3cd',
-    borderColor: '#ffeaa7',
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 24,
     marginTop: 20,
     alignItems: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   errorTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#856404',
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FF3B30',
+    marginBottom: 12,
     textAlign: 'center',
   },
   errorMessage: {
-    fontSize: 14,
-    color: '#856404',
+    fontSize: 16,
+    color: '#FF3B30',
     textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 20,
+    marginBottom: 20,
+    lineHeight: 22,
+    opacity: 0.8,
   },
   errorHelp: {
-    fontSize: 12,
-    color: '#6c757d',
+    fontSize: 14,
+    color: '#8E8E93',
     textAlign: 'center',
-    marginTop: 12,
+    marginTop: 16,
     fontStyle: 'italic',
   },
   retryButton: {
     backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
   },
   retryButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   alertsSection: {
-    padding: 20,
-    borderRadius: 16,
-    marginTop: 20,
+    padding: 24,
+    borderRadius: 20,
+    marginTop: 24,
     marginBottom: 40,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   alertsTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   alertsMessage: {
-    fontSize: 14,
+    fontSize: 16,
     opacity: 0.7,
-  },
-  stationName: {
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  waitIcon: {
-    backgroundColor: '#FFF3CD',
-  },
-  waitTime: {
-    color: '#FF6B35',
-    fontWeight: '600',
-  },
-  trainInfo: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  trainInfoText: {
-    fontSize: 13,
-    color: '#666',
-    textAlign: 'center',
-  },
-  departureTime: {
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  transferIcon: {
-    backgroundColor: '#E8F4FD',
-  },
-  transferTime: {
-    color: '#007AFF',
-    fontWeight: '600',
+    fontWeight: '500',
   },
 });
 
 const lightStyles = StyleSheet.create({
   container: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F2F2F7',
+  },
+  backgroundGradient: {
+    background: 'linear-gradient(180deg, #F2F2F7 0%, #E5E5EA 100%)',
   },
   text: {
     color: '#000',
   },
   subtitleText: {
-    color: '#666',
+    color: '#8E8E93',
   },
   statusText: {
-    color: '#666',
+    color: '#8E8E93',
   },
   statusBar: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backdropFilter: 'blur(20px)',
   },
   themeToggle: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backdropFilter: 'blur(20px)',
   },
   errorContainer: {
-    backgroundColor: '#fff3cd',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backdropFilter: 'blur(20px)',
   },
   alertsSection: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backdropFilter: 'blur(20px)',
   },
 });
 
@@ -861,25 +936,32 @@ const darkStyles = StyleSheet.create({
   container: {
     backgroundColor: '#000',
   },
+  backgroundGradient: {
+    background: 'linear-gradient(180deg, #000 0%, #1C1C1E 100%)',
+  },
   text: {
     color: '#fff',
   },
   subtitleText: {
-    color: '#999',
+    color: '#8E8E93',
   },
   statusText: {
-    color: '#999',
+    color: '#8E8E93',
   },
   statusBar: {
-    backgroundColor: '#1c1c1e',
+    backgroundColor: 'rgba(28, 28, 30, 0.8)',
+    backdropFilter: 'blur(20px)',
   },
   themeToggle: {
-    backgroundColor: '#2c2c2e',
+    backgroundColor: 'rgba(44, 44, 46, 0.8)',
+    backdropFilter: 'blur(20px)',
   },
   errorContainer: {
-    backgroundColor: '#2c2c2e',
+    backgroundColor: 'rgba(28, 28, 30, 0.9)',
+    backdropFilter: 'blur(20px)',
   },
   alertsSection: {
-    backgroundColor: '#1c1c1e',
+    backgroundColor: 'rgba(28, 28, 30, 0.8)',
+    backdropFilter: 'blur(20px)',
   },
 });
