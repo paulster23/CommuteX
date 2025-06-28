@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Animated } from 'react-native';
 import { RealMTAService, Route } from '../services/RealMTAService';
+<<<<<<< HEAD
 import { TransferRouteIcon } from './TransferRouteIcon';
+=======
+>>>>>>> parent of 585503d (Elegant CommuteX UI Redesign with Liquid Glass Design)
 
 const COMMUTE_DATA = {
   home: '42 Woodhull St, Brooklyn',
@@ -115,7 +118,15 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
       {/* Main Route Info */}
       <View style={styles.routeHeader}>
         <View style={styles.routeMainInfo}>
+<<<<<<< HEAD
           {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
+=======
+          {subwayLine && (
+            <View style={[styles.subwayIcon, { backgroundColor: subwayColor }]}>
+              <Text style={styles.subwayIconText}>{subwayLine}</Text>
+            </View>
+          )}
+>>>>>>> parent of 585503d (Elegant CommuteX UI Redesign with Liquid Glass Design)
           <View style={styles.routeTextInfo}>
             <Text style={styles.routeTitle}>
               {route.method.replace(' + Walk', '')}
@@ -251,6 +262,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                           Transfer at <Text style={styles.stationName}>{transferStation}</Text>
                         </Text>
                         <Text style={[styles.stepTime, styles.transferTime]}>
+<<<<<<< HEAD
                           30 sec walk
                         </Text>
                       </View>
@@ -267,6 +279,9 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                         </Text>
                         <Text style={[styles.stepTime, styles.waitTime]}>
                           ~{route.secondWaitTime || 5} min wait
+=======
+                          3-5 min transfer
+>>>>>>> parent of 585503d (Elegant CommuteX UI Redesign with Liquid Glass Design)
                         </Text>
                       </View>
                     </View>
