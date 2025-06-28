@@ -168,11 +168,28 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
             </View>
             <View style={styles.stepContent}>
               <Text style={styles.stepText}>
-                Walk {route.walkingToTransit}m to {subwayLine} train
+                Walk {route.walkingToTransit}m to {subwayLine} train at <Text style={styles.stationName}>{route.startingStation}</Text>
               </Text>
               <Text style={styles.stepTime}>{route.walkingToTransit} min</Text>
             </View>
           </View>
+
+          {/* Wait Step */}
+          {route.waitTime && route.waitTime > 0 && (
+            <View style={styles.step}>
+              <View style={[styles.stepIcon, styles.waitIcon]}>
+                <Text style={styles.stepIconText}>⏱️</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={styles.stepText}>
+                  Wait for next {subwayLine} train at <Text style={styles.stationName}>{route.startingStation}</Text>
+                </Text>
+                <Text style={[styles.stepTime, styles.waitTime]}>
+                  {route.waitTime} min wait
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Transit Step */}
           <View style={styles.step}>
@@ -181,25 +198,36 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
             </View>
             <View style={styles.stepContent}>
               <Text style={styles.stepText}>
-                Take {subwayLine} train to destination
+                Take {subwayLine} train from <Text style={styles.stationName}>{route.startingStation}</Text> to <Text style={styles.stationName}>{route.endingStation}</Text>
               </Text>
               <Text style={styles.stepTime}>
-                {parseInt(route.duration.replace(' min', '')) - (route.walkingToTransit || 0)} min
+                {parseInt(route.duration.replace(' min', '')) - (route.walkingToTransit || 0) - (route.waitTime || 0) - (route.finalWalkingTime || 0)} min
               </Text>
             </View>
           </View>
 
+          {/* Train Departure Info */}
+          {route.nextTrainDeparture && (
+            <View style={styles.trainInfo}>
+              <Text style={styles.trainInfoText}>
+                Next {subwayLine} train departs: <Text style={styles.departureTime}>{route.nextTrainDeparture}</Text>
+              </Text>
+            </View>
+          )}
+
           {/* Final Walking Step */}
-          {route.walkingDistance && (
+          {(route.walkingDistance || route.finalWalkingTime) && (
             <View style={styles.step}>
               <View style={styles.stepIcon}>
                 <Text style={styles.stepIconText}>🚶</Text>
               </View>
               <View style={styles.stepContent}>
                 <Text style={styles.stepText}>
-                  Walk to destination
+                  Walk to destination from <Text style={styles.stationName}>{route.endingStation}</Text>
                 </Text>
-                <Text style={styles.stepTime}>{route.walkingDistance}</Text>
+                <Text style={styles.stepTime}>
+                  {route.finalWalkingTime ? `${route.finalWalkingTime} min` : route.walkingDistance}
+                </Text>
               </View>
             </View>
           )}
@@ -680,6 +708,33 @@ const styles = StyleSheet.create({
   alertsMessage: {
     fontSize: 14,
     opacity: 0.7,
+  },
+  stationName: {
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  waitIcon: {
+    backgroundColor: '#FFF3CD',
+  },
+  waitTime: {
+    color: '#FF6B35',
+    fontWeight: '600',
+  },
+  trainInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  trainInfoText: {
+    fontSize: 13,
+    color: '#666',
+    textAlign: 'center',
+  },
+  departureTime: {
+    fontWeight: '600',
+    color: '#007AFF',
   },
 });
 

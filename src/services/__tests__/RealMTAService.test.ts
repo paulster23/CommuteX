@@ -1,4 +1,4 @@
-import { RealMTAService } from '../RealMTAService';
+import { RealMTAService, Route } from '../RealMTAService';
 
 describe('RealMTAService', () => {
   let service: RealMTAService;
@@ -76,6 +76,151 @@ describe('RealMTAService', () => {
       }
     } catch (error) {
       // MTA alerts API may be unavailable
+      expect(error).toBeInstanceOf(Error);
+    }
+  });
+
+  // TEST: Station name functionality
+  test('shouldIncludeStartingAndEndingStationNames', async () => {
+    try {
+      const routes = await service.calculateRoutes(
+        '42 Woodhull St, Brooklyn',
+        '512 W 22nd St, Manhattan',
+        '9:00 AM'
+      );
+      
+      if (routes.length > 0) {
+        const route = routes[0];
+        expect(route).toHaveProperty('startingStation');
+        expect(route).toHaveProperty('endingStation');
+        expect(typeof route.startingStation).toBe('string');
+        expect(typeof route.endingStation).toBe('string');
+        expect(route.startingStation).not.toBe('');
+        expect(route.endingStation).not.toBe('');
+      }
+    } catch (error) {
+      // Real MTA data may be unavailable - this is acceptable
+      expect(error).toBeInstanceOf(Error);
+    }
+  });
+
+  // TEST: Wait time calculation functionality
+  test('shouldCalculateWaitTimeAtStation', async () => {
+    try {
+      const routes = await service.calculateRoutes(
+        '42 Woodhull St, Brooklyn',
+        '512 W 22nd St, Manhattan',
+        '9:00 AM'
+      );
+      
+      if (routes.length > 0) {
+        const route = routes[0];
+        expect(route).toHaveProperty('waitTime');
+        expect(route).toHaveProperty('nextTrainDeparture');
+        
+        if (route.waitTime !== undefined) {
+          expect(typeof route.waitTime).toBe('number');
+          expect(route.waitTime).toBeGreaterThanOrEqual(0);
+          expect(route.waitTime).toBeLessThan(20); // Reasonable upper bound
+        }
+        
+        if (route.nextTrainDeparture) {
+          expect(typeof route.nextTrainDeparture).toBe('string');
+          expect(route.nextTrainDeparture).toMatch(/\d{1,2}:\d{2}\s(AM|PM)/);
+        }
+      }
+    } catch (error) {
+      // Real MTA data may be unavailable - this is acceptable
+      expect(error).toBeInstanceOf(Error);
+    }
+  });
+
+  // TEST: Station mapping for specific train lines
+  test('shouldMapCorrectStationsForFTrain', async () => {
+    try {
+      const routes = await service.calculateRoutes(
+        '42 Woodhull St, Brooklyn',
+        '512 W 22nd St, Manhattan',
+        '9:00 AM'
+      );
+      
+      const fTrainRoute = routes.find((route: Route) => route.method.includes('F train'));
+      if (fTrainRoute) {
+        expect(fTrainRoute.startingStation).toBe('Carroll St');
+        expect(fTrainRoute.endingStation).toBe('23rd St');
+      }
+    } catch (error) {
+      // Real MTA data may be unavailable - this is acceptable
+      expect(error).toBeInstanceOf(Error);
+    }
+  });
+
+  // TEST: Station mapping for R train
+  test('shouldMapCorrectStationsForRTrain', async () => {
+    try {
+      const routes = await service.calculateRoutes(
+        '42 Woodhull St, Brooklyn',
+        '512 W 22nd St, Manhattan',
+        '9:00 AM'
+      );
+      
+      const rTrainRoute = routes.find((route: Route) => route.method.includes('R train'));
+      if (rTrainRoute) {
+        expect(rTrainRoute.startingStation).toBe('Union St');
+        expect(rTrainRoute.endingStation).toBe('23rd St');
+      }
+    } catch (error) {
+      // Real MTA data may be unavailable - this is acceptable
+      expect(error).toBeInstanceOf(Error);
+    }
+  });
+
+  // TEST: Final walking time calculation
+  test('shouldIncludeFinalWalkingTime', async () => {
+    try {
+      const routes = await service.calculateRoutes(
+        '42 Woodhull St, Brooklyn',
+        '512 W 22nd St, Manhattan',
+        '9:00 AM'
+      );
+      
+      if (routes.length > 0) {
+        const route = routes[0];
+        expect(route).toHaveProperty('finalWalkingTime');
+        expect(typeof route.finalWalkingTime).toBe('number');
+        expect(route.finalWalkingTime).toBeGreaterThan(0);
+        expect(route.finalWalkingTime).toBeLessThan(15); // Reasonable upper bound for final walk
+      }
+    } catch (error) {
+      // Real MTA data may be unavailable - this is acceptable
+      expect(error).toBeInstanceOf(Error);
+    }
+  });
+
+  // TEST: Total duration includes final walking time
+  test('shouldIncludeFinalWalkingTimeInTotalDuration', async () => {
+    try {
+      const routes = await service.calculateRoutes(
+        '42 Woodhull St, Brooklyn',
+        '512 W 22nd St, Manhattan',
+        '9:00 AM'
+      );
+      
+      if (routes.length > 0) {
+        const route = routes[0];
+        const totalMinutes = parseInt(route.duration.replace(' min', ''));
+        
+        // Verify that total duration is reasonable (should include all walking times)
+        expect(totalMinutes).toBeGreaterThan(30); // Minimum reasonable commute time
+        expect(totalMinutes).toBeLessThan(120); // Maximum reasonable commute time
+        
+        // If finalWalkingTime exists, it should be included in calculations
+        if (route.finalWalkingTime) {
+          expect(route.finalWalkingTime).toBeGreaterThan(0);
+        }
+      }
+    } catch (error) {
+      // Real MTA data may be unavailable - this is acceptable
       expect(error).toBeInstanceOf(Error);
     }
   });

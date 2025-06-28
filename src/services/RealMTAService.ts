@@ -1,4 +1,5 @@
 import { StaticLocationProvider, LocationProvider } from './LocationService';
+import { StationMappingService } from './StationMappingService';
 
 export interface Route {
   id: number;
@@ -11,6 +12,11 @@ export interface Route {
   walkingToTransit?: number;
   isRealTimeData: boolean;
   confidence?: 'high' | 'medium' | 'low';
+  startingStation?: string;
+  endingStation?: string;
+  waitTime?: number; // minutes to wait at station for next train
+  nextTrainDeparture?: string; // time of next train departure
+  finalWalkingTime?: number; // minutes to walk from ending station to destination
 }
 
 export interface GTFSData {
@@ -246,26 +252,107 @@ export class RealMTAService {
       const routeIdStr = trip.trip.routeId;
       const walkingTime = walkingTimes[routeIdStr] || 30;
       
-      // Calculate arrival time from GTFS-RT data
-      const arrivalTime = this.calculateArrivalFromGTFS(trip);
-      const totalTime = walkingTime + this.calculateTransitTime(trip);
+      // Get station information including final walking details
+      const stationInfo = this.getStationInfo(routeIdStr);
+      
+      // Calculate wait time and next train departure
+      const waitInfo = this.calculateWaitTime(routeIdStr, walkingTime, trip);
+      
+      // Use station-specific final walking time
+      const finalWalkingTime = stationInfo.finalWalkingTime;
+      
+      // Calculate total time including all segments
+      const transitTime = this.calculateTransitTime(trip);
+      const totalTime = walkingTime + waitInfo.waitTime + transitTime + finalWalkingTime;
+      
+      // Calculate arrival time based on total journey time
+      const currentTime = new Date();
+      const arrivalTime = new Date(currentTime.getTime() + totalTime * 60000);
+      const arrivalTimeStr = arrivalTime.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
       
       return {
         id: routeId,
-        arrivalTime,
+        arrivalTime: arrivalTimeStr,
         duration: `${totalTime} min`,
         method: `${routeIdStr} train + Walk`,
-        details: `Walk ${walkingTime} min to ${routeIdStr} train, ${routeIdStr} train to destination`,
+        details: `Walk ${walkingTime} min to ${routeIdStr} train, ${routeIdStr} train to destination, walk ${finalWalkingTime} min to work`,
         transfers: this.countTransfers(trip),
-        walkingDistance: '0.4 mi', // This could be calculated from GTFS data
+        walkingDistance: stationInfo.finalWalkingDistance,
         walkingToTransit: walkingTime,
         isRealTimeData: true,
-        confidence: this.assessDataConfidence(trip)
+        confidence: this.assessDataConfidence(trip),
+        startingStation: stationInfo.startingStation,
+        endingStation: stationInfo.endingStation,
+        waitTime: waitInfo.waitTime,
+        nextTrainDeparture: waitInfo.nextTrainDeparture,
+        finalWalkingTime: finalWalkingTime
       };
     } catch (error) {
       console.warn('Failed to build route from trip:', error);
       return null;
     }
+  }
+  private getStationInfo(routeId: string): { startingStation: string; endingStation: string; finalWalkingDistance: string; finalWalkingTime: number } {
+    return StationMappingService.getStationMapping(routeId);
+  }
+
+  private calculateWaitTime(routeId: string, walkingTime: number, trip: any): { waitTime: number; nextTrainDeparture: string } {
+    const currentTime = new Date();
+    
+    // Calculate when we arrive at the station
+    const arrivalAtStation = new Date(currentTime.getTime() + walkingTime * 60000);
+    
+    // Simulate next train departure based on GTFS data and typical frequencies
+    const trainFrequencies: { [key: string]: number } = {
+      'F': 6,  // F train: every 6 minutes during peak
+      'R': 8,  // R train: every 8 minutes
+      '4': 5,  // 4 train: every 5 minutes (express)
+      'N': 8,  // N train: every 8 minutes
+      'Q': 7,  // Q train: every 7 minutes
+      'W': 10  // W train: every 10 minutes
+    };
+
+    const frequency = trainFrequencies[routeId] || 8;
+    
+    // Use trip data to get more realistic departure time
+    const tripVariation = this.getTripVariation(trip);
+    const baseWaitTime = Math.max(1, frequency + tripVariation % 5); // 1-10 minute range
+    
+    // Calculate next train departure
+    const nextTrainTime = new Date(arrivalAtStation.getTime() + baseWaitTime * 60000);
+    const nextTrainDeparture = nextTrainTime.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    return {
+      waitTime: baseWaitTime,
+      nextTrainDeparture
+    };
+  }
+
+  private calculateFinalWalkingTime(distance: string): number {
+    // Calculate walking time based on distance
+    // Average walking speed is about 3 mph (20 minutes per mile)
+    
+    if (distance.includes('mi')) {
+      const miles = parseFloat(distance.replace(' mi', ''));
+      return Math.round(miles * 20); // 20 minutes per mile
+    }
+    
+    if (distance.includes('ft')) {
+      const feet = parseFloat(distance.replace(' ft', ''));
+      const miles = feet / 5280; // Convert feet to miles
+      return Math.round(miles * 20);
+    }
+    
+    // Default to 8 minutes for 0.4 miles
+    return 8;
   }
 
   private async buildBusRouteFromTrip(trip: any, walkingTimes: any, routeId: number): Promise<Route | null> {
