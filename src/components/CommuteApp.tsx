@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Animated } from 'react-native';
 import { RealMTAService, Route } from '../services/RealMTAService';
+import { TransferRouteIcon } from './TransferRouteIcon';
 
 const COMMUTE_DATA = {
   home: '42 Woodhull St, Brooklyn',
@@ -114,11 +115,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
       {/* Main Route Info */}
       <View style={styles.routeHeader}>
         <View style={styles.routeMainInfo}>
-          {subwayLine && (
-            <View style={[styles.subwayIcon, { backgroundColor: subwayColor }]}>
-              <Text style={styles.subwayIconText}>{subwayLine}</Text>
-            </View>
-          )}
+          {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
           <View style={styles.routeTextInfo}>
             <Text style={styles.routeTitle}>
               {route.method.replace(' + Walk', '')}
