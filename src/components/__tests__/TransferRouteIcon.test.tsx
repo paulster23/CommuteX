@@ -24,17 +24,24 @@ describe('TransferRouteIcon', () => {
   });
 
   it('shouldApplyCorrectColorsToSubwayIcons', () => {
-    const { queryAllByTestId } = render(
+    const { queryAllByTestId, getByText } = render(
       <TransferRouteIcon routeLine="F→C" />
     );
     
     const icons = queryAllByTestId('subway-icon');
     
+    // Check background colors
     expect(icons[0].props.style).toEqual(expect.arrayContaining([
       expect.objectContaining({ backgroundColor: '#FF6319' }) // Orange for F train
     ]));
     expect(icons[1].props.style).toEqual(expect.arrayContaining([
       expect.objectContaining({ backgroundColor: '#0039A6' }) // Blue for C train
     ]));
+    
+    // Check text color is white
+    const fText = getByText('F');
+    const cText = getByText('C');
+    expect(fText.props.style).toMatchObject({ color: '#fff' });
+    expect(cText.props.style).toMatchObject({ color: '#fff' });
   });
 });

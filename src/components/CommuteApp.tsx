@@ -251,7 +251,22 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                           Transfer at <Text style={styles.stationName}>{transferStation}</Text>
                         </Text>
                         <Text style={[styles.stepTime, styles.transferTime]}>
-                          3-5 min transfer
+                          30 sec walk
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    {/* Wait for second train */}
+                    <View style={styles.step}>
+                      <View style={[styles.stepIcon, styles.waitIcon]}>
+                        <Text style={styles.stepIconText}>⏱️</Text>
+                      </View>
+                      <View style={styles.stepContent}>
+                        <Text style={styles.stepText}>
+                          Wait for next {secondLine} train at <Text style={styles.stationName}>{transferStation}</Text>
+                        </Text>
+                        <Text style={[styles.stepTime, styles.waitTime]}>
+                          ~{route.secondWaitTime || 5} min wait
                         </Text>
                       </View>
                     </View>
@@ -489,7 +504,7 @@ export function CommuteApp() {
               route={route}
               isExpanded={expandedRoutes.has(route.id)}
               onToggle={() => toggleRouteExpansion(route.id)}
-              isBestRoute={index === 0}
+              isBestRoute={index === 0} // First route is now the fastest
             />
           ))
         )}

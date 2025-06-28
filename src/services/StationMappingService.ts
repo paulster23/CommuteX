@@ -54,7 +54,7 @@ export class StationMappingService {
       startingStation: 'Carroll St',
       transferStation: 'Jay St-MetroTech',
       transferToLines: ['A', 'C'],
-      transferWalkingTime: 3, // ~3 min to transfer between F and A/C platforms
+      transferWalkingTime: 0.5, // 30 seconds to transfer between F and A/C platforms
       endingStation: '14th St-8th Ave',
       finalWalkingDistance: '0.6 mi', // 14th St-8th Ave to 512 W 22nd St
       finalWalkingTime: 12 // ~12 minute walk from 8th Ave to between 10th/11th Ave
@@ -63,7 +63,7 @@ export class StationMappingService {
       startingStation: 'Carroll St',
       transferStation: 'Jay St-MetroTech',
       transferToLines: ['A', 'C'],
-      transferWalkingTime: 3,
+      transferWalkingTime: 0.5, // 30 seconds to transfer between F and A/C platforms
       endingStation: '23rd St-8th Ave',
       finalWalkingDistance: '0.3 mi', // 23rd St-8th Ave to 512 W 22nd St
       finalWalkingTime: 6 // ~6 minute walk from 8th Ave to between 10th/11th Ave

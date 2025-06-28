@@ -1,10 +1,19 @@
 import { RealMTAService, Route } from '../RealMTAService';
 
+// Mock fetch for testing
+const mockFetch = jest.fn();
+global.fetch = mockFetch as any;
+
 describe('RealMTAService', () => {
   let service: RealMTAService;
 
   beforeEach(() => {
     service = new RealMTAService();
+    mockFetch.mockClear();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   test('shouldInitializeWithoutAPIKey', () => {
@@ -222,6 +231,177 @@ describe('RealMTAService', () => {
     } catch (error) {
       // Real MTA data may be unavailable - this is acceptable
       expect(error).toBeInstanceOf(Error);
+    }
+  });
+
+  // NEW TESTS FOR GTFS PARSING ERROR HANDLING
+
+  test('shouldHandleInvalidProtocolBufferData', async () => {
+    // Create a private method test helper
+    const testFetchGTFSFeed = async () => {
+      // Access private method through prototype
+      const fetchMethod = (service as any).fetchGTFSRealtimeFeed.bind(service);
+      return fetchMethod('https://test-feed.com');
+    };
+
+    // Mock fetch to return HTML error page instead of protobuf
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: () => null
+      },
+      arrayBuffer: async () => {
+        // Return HTML content that would cause "invalid wire type 4 at offset 1" error
+        const htmlContent = '<html><body>Service Temporarily Unavailable</body></html>';
+        return new TextEncoder().encode(htmlContent).buffer;
+      }
+    } as any);
+
+    // This should not crash but handle the error gracefully
+    await expect(testFetchGTFSFeed()).rejects.toThrow(/Failed to parse GTFS-RT data format/);
+  });
+
+  test('shouldHandleCorruptedGTFSData', async () => {
+    const testFetchGTFSFeed = async () => {
+      const fetchMethod = (service as any).fetchGTFSRealtimeFeed.bind(service);
+      return fetchMethod('https://test-feed.com');
+    };
+
+    // Mock fetch to return corrupted binary data
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: () => null
+      },
+      arrayBuffer: async () => {
+        // Return random bytes that don't form valid protobuf
+        const corruptedData = new Uint8Array([0xFF, 0xFE, 0xFD, 0xFC, 0xFB]);
+        return corruptedData.buffer;
+      }
+    } as any);
+
+    await expect(testFetchGTFSFeed()).rejects.toThrow(/Failed to parse GTFS-RT data format/);
+  });
+
+  test('shouldValidateContentTypeBeforeParsing', async () => {
+    const testFetchGTFSFeed = async () => {
+      const fetchMethod = (service as any).fetchGTFSRealtimeFeed.bind(service);
+      return fetchMethod('https://test-feed.com');
+    };
+
+    // Mock fetch to return wrong content type
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: (name: string) => name === 'content-type' ? 'text/html' : null
+      },
+      arrayBuffer: async () => {
+        const htmlContent = '<!DOCTYPE html><html><body>Error</body></html>';
+        return new TextEncoder().encode(htmlContent).buffer;
+      }
+    } as any);
+
+    // Should detect wrong content type and provide helpful error
+    await expect(testFetchGTFSFeed()).rejects.toThrow(/Invalid content type/);
+  });
+
+  test('shouldHandleEmptyProtocolBufferResponse', async () => {
+    const testFetchGTFSFeed = async () => {
+      const fetchMethod = (service as any).fetchGTFSRealtimeFeed.bind(service);
+      return fetchMethod('https://test-feed.com');
+    };
+
+    // Mock fetch to return empty buffer
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: () => null
+      },
+      arrayBuffer: async () => new ArrayBuffer(0)
+    } as any);
+
+    await expect(testFetchGTFSFeed()).rejects.toThrow(/Empty response/);
+  });
+
+  test('shouldRetryOnTransientGTFSParsingFailure', async () => {
+    const testFetchGTFSFeed = async () => {
+      const fetchMethod = (service as any).fetchGTFSRealtimeFeed.bind(service);
+      return fetchMethod('https://test-feed.com');
+    };
+
+    // First call fails with parsing error
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: () => null
+      },
+      arrayBuffer: async () => {
+        const badData = new TextEncoder().encode('bad data').buffer;
+        return badData;
+      }
+    } as any);
+
+    // Second call succeeds with valid (mock) protobuf data
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: () => null
+      },
+      arrayBuffer: async () => {
+        // Mock valid GTFS data structure
+        const validData = new Uint8Array([0x0A, 0x00]); // Minimal valid protobuf
+        return validData.buffer;
+      }
+    } as any);
+
+    // Should retry and eventually succeed
+    const result = await testFetchGTFSFeed();
+    expect(result).toBeDefined();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('shouldProvideDetailedErrorForGTFSParsingFailure', async () => {
+    const testFetchGTFSFeed = async () => {
+      const fetchMethod = (service as any).fetchGTFSRealtimeFeed.bind(service);
+      return fetchMethod('https://test-feed.com');
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: () => null
+      },
+      arrayBuffer: async () => {
+        // Data that will cause specific protobuf error
+        const invalidProtobuf = new Uint8Array([0x04, 0x01]); // Invalid wire type 4
+        return invalidProtobuf.buffer;
+      }
+    } as any);
+
+    try {
+      await testFetchGTFSFeed();
+      fail('Should have thrown an error');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      const errorMessage = (error as Error).message;
+      expect(errorMessage).toContain('GTFS');
+      expect(errorMessage).toContain('parse');
+      // Should include which feed failed
+      expect(errorMessage).toMatch(/feed|URL/i);
     }
   });
 });

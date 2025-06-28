@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   subwayIconText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000',
+    color: '#fff',
   },
   transferArrow: {
     fontSize: 16,

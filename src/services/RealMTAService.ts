@@ -17,6 +17,10 @@ export interface Route {
   waitTime?: number; // minutes to wait at station for next train
   nextTrainDeparture?: string; // time of next train departure
   finalWalkingTime?: number; // minutes to walk from ending station to destination
+  // Transfer-specific fields
+  transferStation?: string;
+  transferWalkingTime?: number;
+  secondWaitTime?: number;
 }
 
 export interface GTFSData {
@@ -43,9 +47,9 @@ export class RealMTAService {
     subwayG: 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g',
     subwayJZ: 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz',
     subwayNQRW: 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw',
-    subway123456S: 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-123456s',
+    subway123456S: 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs', // Main feed includes 1234567S
     subwayL: 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-l',
-    bus: 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bus-company',
+    bus: 'https://bustime.mta.info/api/siri/vehicle-monitoring.pb?key=126eec8e-0ee7-4b50-a84c-5d11aaaef4f9', // Bus real-time feed with API key
     alerts: 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts'
   };
 
@@ -80,9 +84,10 @@ export class RealMTAService {
     try {
       const gtfsData = await this.fetchRealTimeData();
       return gtfsData.routes.sort((a, b) => {
-        const timeA = this.parseTime(a.arrivalTime);
-        const timeB = this.parseTime(b.arrivalTime);
-        return timeA.getTime() - timeB.getTime();
+        // Sort by duration (shortest travel time first)
+        const durationA = parseInt(a.duration.replace(' min', ''));
+        const durationB = parseInt(b.duration.replace(' min', ''));
+        return durationA - durationB;
       });
     } catch (error) {
       throw new Error(`Unable to calculate routes: ${error instanceof Error ? error.message : 'MTA data unavailable'}`);
@@ -98,39 +103,124 @@ export class RealMTAService {
     }
   }
 
-  private async fetchGTFSRealtimeFeed(url: string): Promise<any> {
+  private async fetchGTFSRealtimeFeed(url: string, retryCount: number = 0): Promise<any> {
     console.log(`[DEBUG] Fetching GTFS feed from: ${url}`);
     
-    // Public MTA feeds - no authentication required
-    const response = await fetch(url);
-    console.log(`[DEBUG] Response status: ${response.status} ${response.statusText}`);
-
-    if (!response.ok) {
-      if (response.status === 503) {
-        console.error(`[DEBUG] MTA service unavailable (503) for: ${url}`);
-        throw new Error('MTA GTFS service is temporarily unavailable.');
-      }
-      console.error(`[DEBUG] MTA API error for ${url}: ${response.status} ${response.statusText}`);
-      throw new Error(`MTA API error: ${response.status} ${response.statusText}`);
-    }
-
-    const buffer = await response.arrayBuffer();
-    console.log(`[DEBUG] Received buffer size: ${buffer.byteLength} bytes`);
-    
-    // Parse GTFS-RT Protocol Buffer data
     try {
-      const GtfsRealtimeBindings = require('gtfs-realtime-bindings');
-      const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(new Uint8Array(buffer));
-      console.log(`[DEBUG] Successfully parsed GTFS feed with ${feed.entity?.length || 0} entities`);
-      return feed;
+      // Public MTA feeds - no authentication required
+      const response = await fetch(url);
+      console.log(`[DEBUG] Response status: ${response.status} ${response.statusText}`);
+      
+      // Log all headers for debugging
+      const headers: { [key: string]: string } = {};
+      try {
+        if (response.headers && typeof response.headers.forEach === 'function') {
+          response.headers.forEach((value, key) => {
+            headers[key] = value;
+          });
+        } else if (response.headers && typeof response.headers.get === 'function') {
+          // Handle mock headers that only have get method
+          const commonHeaders = ['content-type', 'content-length', 'cache-control', 'date'];
+          commonHeaders.forEach(key => {
+            const value = response.headers.get(key);
+            if (value) headers[key] = value;
+          });
+        }
+      } catch (headerError) {
+        console.log(`[DEBUG] Could not read headers:`, headerError);
+      }
+      console.log(`[DEBUG] Response headers:`, headers);
+
+      if (!response.ok) {
+        if (response.status === 503) {
+          console.error(`[DEBUG] MTA service unavailable (503) for: ${url}`);
+          throw new Error('MTA GTFS service is temporarily unavailable.');
+        }
+        console.error(`[DEBUG] MTA API error for ${url}: ${response.status} ${response.statusText}`);
+        throw new Error(`MTA API error: ${response.status} ${response.statusText}`);
+      }
+
+      // Check content type
+      const contentType = response.headers?.get?.('content-type') || '';
+      if (contentType.includes('text/html')) {
+        console.error(`[DEBUG] Invalid content type for ${url}: ${contentType}`);
+        throw new Error(`Invalid content type: expected protobuf, got ${contentType}`);
+      }
+
+      const buffer = await response.arrayBuffer();
+      console.log(`[DEBUG] Received buffer size: ${buffer.byteLength} bytes`);
+      
+      // Validate buffer is not empty
+      if (buffer.byteLength === 0) {
+        console.error(`[DEBUG] Empty response from ${url}`);
+        throw new Error('Empty response from MTA feed');
+      }
+      
+      // Validate buffer looks like protobuf (basic check)
+      const uint8Array = new Uint8Array(buffer);
+      
+      // Enhanced debugging: log first bytes and text representation
+      console.log(`[DEBUG] First 50 bytes:`, Array.from(uint8Array.slice(0, 50)));
+      const textPreview = new TextDecoder().decode(uint8Array.slice(0, 200));
+      console.log(`[DEBUG] Response preview as text:`, textPreview);
+      
+      // More robust HTML/XML detection
+      const isHTML = textPreview.includes('<html') || 
+                     textPreview.includes('<!DOCTYPE') ||
+                     textPreview.includes('<title>') ||
+                     textPreview.includes('<body>') ||
+                     (uint8Array[0] === 0x3C && // Starts with <
+                      (uint8Array[1] === 0x21 || // <!
+                       uint8Array[1] === 0x68 || // <h
+                       uint8Array[1] === 0x48)); // <H
+      
+      const isXML = textPreview.includes('<?xml') || 
+                    textPreview.includes('<Error>') ||
+                    textPreview.includes('<Code>NoSuchKey</Code>');
+      
+      if (isHTML || isXML) {
+        console.error(`[DEBUG] Response appears to be ${isXML ? 'XML' : 'HTML'}, not protobuf`);
+        console.error(`[DEBUG] Content preview:`, textPreview);
+        console.error(`[DEBUG] Failed URL:`, url);
+        
+        // Check for specific XML error messages
+        if (textPreview.includes('NoSuchKey')) {
+          throw new Error(`Invalid MTA feed URL: ${url} - The specified feed does not exist`);
+        }
+        
+        throw new Error(`Failed to parse GTFS-RT data format: received ${isXML ? 'XML' : 'HTML'} instead of protobuf data`);
+      }
+      
+      // Parse GTFS-RT Protocol Buffer data
+      try {
+        const GtfsRealtimeBindings = require('gtfs-realtime-bindings');
+        const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(uint8Array);
+        console.log(`[DEBUG] Successfully parsed GTFS feed with ${feed.entity?.length || 0} entities`);
+        return feed;
+      } catch (parseError) {
+        console.error(`[DEBUG] Failed to parse GTFS data from ${url}:`, parseError);
+        
+        // Retry logic for transient failures
+        if (retryCount < 1) {
+          console.log(`[DEBUG] Retrying fetch for ${url} (attempt ${retryCount + 2})`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+          return this.fetchGTFSRealtimeFeed(url, retryCount + 1);
+        }
+        
+        throw new Error(`Failed to parse GTFS-RT data format from feed: ${url}`);
+      }
     } catch (error) {
-      console.error(`[DEBUG] Failed to parse GTFS data:`, error);
-      throw new Error('Failed to parse GTFS-RT data format');
+      if (error instanceof Error && error.message.includes('Failed to parse GTFS-RT')) {
+        throw error; // Re-throw parse errors
+      }
+      // Wrap other errors
+      throw new Error(`Failed to fetch from ${url}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   private async fetchAllSubwayRoutes(): Promise<Route[]> {
     const routes: Route[] = [];
+    const failedFeeds: string[] = [];
     
     // Get walking times to transit options
     const walkingTimes = {
@@ -142,33 +232,45 @@ export class RealMTAService {
 
     // Fetch from relevant feeds based on your commute routes
     const feedsToCheck = [
-      { feed: this.GTFS_RT_FEEDS.subwayNQRW, routes: ['R', 'N', 'Q', 'W'] }, // R/N/Q/W trains
-      { feed: this.GTFS_RT_FEEDS.subwayBDFM, routes: ['F'] }, // F train  
-      { feed: this.GTFS_RT_FEEDS.subway123456S, routes: ['4'] }, // 4 train
-      { feed: this.GTFS_RT_FEEDS.subway, routes: ['A', 'C'] }, // A/C trains for transfers
-      { feed: this.GTFS_RT_FEEDS.subwayL, routes: ['L'] }, // L train for transfers
+      { feed: this.GTFS_RT_FEEDS.subwayNQRW, routes: ['R', 'N', 'Q', 'W'], name: 'NQRW' },
+      { feed: this.GTFS_RT_FEEDS.subwayBDFM, routes: ['F'], name: 'BDFM' },
+      { feed: this.GTFS_RT_FEEDS.subway123456S, routes: ['4'], name: '123456S' },
+      { feed: this.GTFS_RT_FEEDS.subway, routes: ['A', 'C'], name: 'ACE' },
+      { feed: this.GTFS_RT_FEEDS.subwayL, routes: ['L'], name: 'L' },
     ];
 
     let routeId = 1;
     
     // First, collect all GTFS data
     const allGtfsData: { [key: string]: any } = {};
-    for (const { feed, routes: feedRoutes } of feedsToCheck) {
+    const workingFeeds: typeof feedsToCheck = [];
+    
+    for (const feedInfo of feedsToCheck) {
       try {
-        const gtfsData = await this.fetchGTFSRealtimeFeed(feed);
-        feedRoutes.forEach(route => {
+        const gtfsData = await this.fetchGTFSRealtimeFeed(feedInfo.feed);
+        feedInfo.routes.forEach(route => {
           allGtfsData[route] = gtfsData;
         });
+        workingFeeds.push(feedInfo);
       } catch (error) {
-        console.warn(`Failed to fetch from ${feed}:`, error);
+        console.warn(`Failed to fetch from ${feedInfo.name} feed (${feedInfo.feed}):`, error);
+        failedFeeds.push(feedInfo.name);
+        
+        // If it's an HTML response error, log additional info
+        if (error instanceof Error && error.message.includes('HTML')) {
+          console.error(`[DEBUG] ${feedInfo.name} feed returned HTML instead of protobuf data`);
+        }
       }
     }
     
-    // Build direct routes
-    for (const { feed, routes: feedRoutes } of feedsToCheck.slice(0, 3)) { // Only first 3 are direct routes
-      try {
-        const gtfsData = await this.fetchGTFSRealtimeFeed(feed);
-        const relevantTrips = this.findRelevantTrips(gtfsData, feedRoutes);
+    // Log summary of feed status
+    console.log(`[DEBUG] Feed status - Working: ${workingFeeds.map(f => f.name).join(', ') || 'none'}, Failed: ${failedFeeds.join(', ') || 'none'}`);
+    
+    // Build direct routes from working feeds only
+    for (const feedInfo of workingFeeds.slice(0, 3)) { // Only first 3 are direct routes
+      if (allGtfsData[feedInfo.routes[0]]) { // Check if we have data for this route
+        const gtfsData = allGtfsData[feedInfo.routes[0]];
+        const relevantTrips = this.findRelevantTrips(gtfsData, feedInfo.routes);
         
         for (const trip of relevantTrips) {
           const route = await this.buildRouteFromTrip(trip, walkingTimes, routeId++);
@@ -176,8 +278,6 @@ export class RealMTAService {
             routes.push(route);
           }
         }
-      } catch (error) {
-        console.warn(`Failed to fetch from ${feed}:`, error);
       }
     }
     
@@ -624,7 +724,11 @@ export class RealMTAService {
         endingStation: mapping.endingStation,
         waitTime: firstWaitTime,
         nextTrainDeparture: this.calculateNextDeparture(walkingTime),
-        finalWalkingTime: mapping.finalWalkingTime
+        finalWalkingTime: mapping.finalWalkingTime,
+        // Additional transfer-specific data
+        transferStation: mapping.transferStation,
+        transferWalkingTime: mapping.transferWalkingTime,
+        secondWaitTime: secondWaitTime
       };
     } catch (error) {
       console.warn(`Failed to build transfer route ${routeKey}:`, error);
