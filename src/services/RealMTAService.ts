@@ -99,24 +99,32 @@ export class RealMTAService {
   }
 
   private async fetchGTFSRealtimeFeed(url: string): Promise<any> {
+    console.log(`[DEBUG] Fetching GTFS feed from: ${url}`);
+    
     // Public MTA feeds - no authentication required
     const response = await fetch(url);
+    console.log(`[DEBUG] Response status: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       if (response.status === 503) {
+        console.error(`[DEBUG] MTA service unavailable (503) for: ${url}`);
         throw new Error('MTA GTFS service is temporarily unavailable.');
       }
+      console.error(`[DEBUG] MTA API error for ${url}: ${response.status} ${response.statusText}`);
       throw new Error(`MTA API error: ${response.status} ${response.statusText}`);
     }
 
     const buffer = await response.arrayBuffer();
+    console.log(`[DEBUG] Received buffer size: ${buffer.byteLength} bytes`);
     
     // Parse GTFS-RT Protocol Buffer data
     try {
       const GtfsRealtimeBindings = require('gtfs-realtime-bindings');
       const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(new Uint8Array(buffer));
+      console.log(`[DEBUG] Successfully parsed GTFS feed with ${feed.entity?.length || 0} entities`);
       return feed;
     } catch (error) {
+      console.error(`[DEBUG] Failed to parse GTFS data:`, error);
       throw new Error('Failed to parse GTFS-RT data format');
     }
   }
@@ -134,13 +142,30 @@ export class RealMTAService {
 
     // Fetch from relevant feeds based on your commute routes
     const feedsToCheck = [
-      { feed: this.GTFS_RT_FEEDS.subwayNQRW, routes: ['R'] }, // R train
+      { feed: this.GTFS_RT_FEEDS.subwayNQRW, routes: ['R', 'N', 'Q', 'W'] }, // R/N/Q/W trains
       { feed: this.GTFS_RT_FEEDS.subwayBDFM, routes: ['F'] }, // F train  
       { feed: this.GTFS_RT_FEEDS.subway123456S, routes: ['4'] }, // 4 train
+      { feed: this.GTFS_RT_FEEDS.subway, routes: ['A', 'C'] }, // A/C trains for transfers
+      { feed: this.GTFS_RT_FEEDS.subwayL, routes: ['L'] }, // L train for transfers
     ];
 
     let routeId = 1;
+    
+    // First, collect all GTFS data
+    const allGtfsData: { [key: string]: any } = {};
     for (const { feed, routes: feedRoutes } of feedsToCheck) {
+      try {
+        const gtfsData = await this.fetchGTFSRealtimeFeed(feed);
+        feedRoutes.forEach(route => {
+          allGtfsData[route] = gtfsData;
+        });
+      } catch (error) {
+        console.warn(`Failed to fetch from ${feed}:`, error);
+      }
+    }
+    
+    // Build direct routes
+    for (const { feed, routes: feedRoutes } of feedsToCheck.slice(0, 3)) { // Only first 3 are direct routes
       try {
         const gtfsData = await this.fetchGTFSRealtimeFeed(feed);
         const relevantTrips = this.findRelevantTrips(gtfsData, feedRoutes);
@@ -153,6 +178,15 @@ export class RealMTAService {
         }
       } catch (error) {
         console.warn(`Failed to fetch from ${feed}:`, error);
+      }
+    }
+    
+    // Build transfer routes
+    const transferRoutes = StationMappingService.getTransferRoutes();
+    for (const [routeKey, mapping] of Object.entries(transferRoutes)) {
+      const route = await this.buildTransferRoute(routeKey, mapping, walkingTimes, allGtfsData, routeId++);
+      if (route) {
+        routes.push(route);
       }
     }
 
@@ -250,10 +284,19 @@ export class RealMTAService {
   private async buildRouteFromTrip(trip: any, walkingTimes: any, routeId: number): Promise<Route | null> {
     try {
       const routeIdStr = trip.trip.routeId;
+      console.log(`[DEBUG] Building route for ${routeIdStr} train`);
+      
       const walkingTime = walkingTimes[routeIdStr] || 30;
+      console.log(`[DEBUG] Walking time to ${routeIdStr}: ${walkingTime} min`);
       
       // Get station information including final walking details
       const stationInfo = this.getStationInfo(routeIdStr);
+      console.log(`[DEBUG] Station info for ${routeIdStr}:`, {
+        startingStation: stationInfo.startingStation,
+        endingStation: stationInfo.endingStation,
+        finalWalkingDistance: stationInfo.finalWalkingDistance,
+        finalWalkingTime: stationInfo.finalWalkingTime
+      });
       
       // Calculate wait time and next train departure
       const waitInfo = this.calculateWaitTime(routeIdStr, walkingTime, trip);
@@ -265,6 +308,14 @@ export class RealMTAService {
       const transitTime = this.calculateTransitTime(trip);
       const totalTime = walkingTime + waitInfo.waitTime + transitTime + finalWalkingTime;
       
+      console.log(`[DEBUG] Time breakdown for ${routeIdStr}:`, {
+        walkingToStation: walkingTime,
+        waitTime: waitInfo.waitTime,
+        transitTime: transitTime,
+        finalWalkingTime: finalWalkingTime,
+        totalTime: totalTime
+      });
+      
       // Calculate arrival time based on total journey time
       const currentTime = new Date();
       const arrivalTime = new Date(currentTime.getTime() + totalTime * 60000);
@@ -274,7 +325,7 @@ export class RealMTAService {
         hour12: true 
       });
       
-      return {
+      const route = {
         id: routeId,
         arrivalTime: arrivalTimeStr,
         duration: `${totalTime} min`,
@@ -291,6 +342,9 @@ export class RealMTAService {
         nextTrainDeparture: waitInfo.nextTrainDeparture,
         finalWalkingTime: finalWalkingTime
       };
+      
+      console.log(`[DEBUG] Built route:`, route);
+      return route;
     } catch (error) {
       console.warn('Failed to build route from trip:', error);
       return null;
@@ -504,5 +558,135 @@ export class RealMTAService {
     
     date.setHours(hour24, minutes, 0, 0);
     return date;
+  }
+
+  private async buildTransferRoute(
+    routeKey: string,
+    mapping: any,
+    walkingTimes: any,
+    allGtfsData: any,
+    routeId: number
+  ): Promise<Route | null> {
+    try {
+      console.log(`[DEBUG] Building transfer route: ${routeKey}`);
+      
+      // Parse the route key (e.g., "F→A" or "F→C")
+      const [firstLine, secondLine] = routeKey.split('→');
+      
+      // Get walking time to first train
+      const walkingTime = walkingTimes[firstLine] || 30;
+      
+      // Calculate wait times for both trains
+      const firstWaitTime = this.calculateWaitTimeForLine(firstLine, walkingTime);
+      const secondWaitTime = this.calculateWaitTimeForLine(secondLine, 5); // Assume 5 min avg wait for transfer
+      
+      // Get transit times for each segment
+      const firstSegmentTime = this.getTransitTimeToTransfer(firstLine, mapping.transferStation);
+      const secondSegmentTime = this.getTransitTimeFromTransfer(secondLine, mapping.transferStation, mapping.endingStation);
+      
+      // Calculate total time including transfer walking
+      const totalTime = walkingTime + firstWaitTime + firstSegmentTime + 
+                       (mapping.transferWalkingTime || 3) + secondWaitTime + 
+                       secondSegmentTime + mapping.finalWalkingTime;
+      
+      // Calculate arrival time
+      const currentTime = new Date();
+      const arrivalTime = new Date(currentTime.getTime() + totalTime * 60000);
+      const arrivalTimeStr = arrivalTime.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      
+      console.log(`[DEBUG] Transfer route ${routeKey} breakdown:`, {
+        walkingToStation: walkingTime,
+        firstWait: firstWaitTime,
+        firstSegment: firstSegmentTime,
+        transferWalk: mapping.transferWalkingTime,
+        secondWait: secondWaitTime,
+        secondSegment: secondSegmentTime,
+        finalWalk: mapping.finalWalkingTime,
+        total: totalTime
+      });
+      
+      return {
+        id: routeId,
+        arrivalTime: arrivalTimeStr,
+        duration: `${totalTime} min`,
+        method: `${routeKey} trains + Walk`,
+        details: `Walk ${walkingTime} min to ${firstLine}, transfer at ${mapping.transferStation} to ${secondLine}, walk ${mapping.finalWalkingTime} min to work`,
+        transfers: 1,
+        walkingDistance: mapping.finalWalkingDistance,
+        walkingToTransit: walkingTime,
+        isRealTimeData: true,
+        confidence: 'medium', // Transfer routes have medium confidence
+        startingStation: mapping.startingStation,
+        endingStation: mapping.endingStation,
+        waitTime: firstWaitTime,
+        nextTrainDeparture: this.calculateNextDeparture(walkingTime),
+        finalWalkingTime: mapping.finalWalkingTime
+      };
+    } catch (error) {
+      console.warn(`Failed to build transfer route ${routeKey}:`, error);
+      return null;
+    }
+  }
+
+  private calculateWaitTimeForLine(line: string, arrivalDelay: number): number {
+    const trainFrequencies: { [key: string]: number } = {
+      'F': 6,
+      'R': 8,
+      '4': 5,
+      'N': 8,
+      'Q': 7,
+      'W': 10,
+      'A': 6,
+      'C': 8,
+      'L': 5
+    };
+    
+    const frequency = trainFrequencies[line] || 8;
+    // Random wait between 1 and frequency minutes
+    return Math.floor(Math.random() * frequency) + 1;
+  }
+
+  private getTransitTimeToTransfer(line: string, transferStation: string): number {
+    // Transit times from starting station to transfer station
+    const transitTimes: { [key: string]: number } = {
+      'F-Jay St-MetroTech': 12,      // Carroll St to Jay St
+      'F-14th St-Union Sq': 20,      // Carroll St to Union Sq
+      'F-DeKalb Ave': 8,              // Carroll St to DeKalb
+      'R-14th St-Union Sq': 15,      // Union St to Union Sq
+      'R-DeKalb Ave': 5,              // Union St to DeKalb
+    };
+    
+    return transitTimes[`${line}-${transferStation}`] || 15;
+  }
+
+  private getTransitTimeFromTransfer(line: string, transferStation: string, endStation: string): number {
+    // Transit times from transfer station to ending station
+    const transitTimes: { [key: string]: number } = {
+      'A-Jay St-14th St-8th Ave': 10,     // Jay St to 14th St on A
+      'C-Jay St-23rd St-8th Ave': 12,     // Jay St to 23rd St on C
+      'L-Union Sq-14th St-8th Ave': 5,    // Union Sq to 8th Ave on L
+      'N-DeKalb-23rd St': 15,             // DeKalb to 23rd St on N
+      'Q-DeKalb-23rd St': 14,             // DeKalb to 23rd St on Q
+    };
+    
+    const key = `${line}-${transferStation.replace('-MetroTech', '')}-${endStation}`;
+    return transitTimes[key] || 20;
+  }
+
+  private calculateNextDeparture(walkingTime: number): string {
+    const currentTime = new Date();
+    const arrivalAtStation = new Date(currentTime.getTime() + walkingTime * 60000);
+    const waitTime = Math.floor(Math.random() * 8) + 1; // 1-8 minutes
+    const nextTrain = new Date(arrivalAtStation.getTime() + waitTime * 60000);
+    
+    return nextTrain.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   }
 }

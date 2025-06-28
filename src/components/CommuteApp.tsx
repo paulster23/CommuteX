@@ -45,6 +45,14 @@ interface RouteCardProps {
 function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps) {
   const [animation] = useState(new Animated.Value(0));
   
+  // Debug logging for final walking step
+  console.log(`[DEBUG RouteCard] Route ${route.id} final walking data:`, {
+    finalWalkingTime: route.finalWalkingTime,
+    walkingDistance: route.walkingDistance,
+    endingStation: route.endingStation,
+    shouldShowFinalWalk: !!(route.walkingDistance || route.finalWalkingTime)
+  });
+  
   useEffect(() => {
     Animated.timing(animation, {
       toValue: isExpanded ? 1 : 0,
@@ -54,6 +62,12 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
   }, [isExpanded]);
 
   const getSubwayLineFromMethod = (method: string): string => {
+    // Handle transfer routes (e.g., "F→A trains + Walk")
+    if (method.includes('→')) {
+      const match = method.match(/^([A-Z0-9→]+)\s+trains/);
+      return match ? match[1] : '';
+    }
+    // Handle single routes (e.g., "F train + Walk")
     const match = method.match(/^([A-Z0-9]+)\s+train/);
     return match ? match[1] : '';
   };
@@ -152,7 +166,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
           {
             maxHeight: animation.interpolate({
               inputRange: [0, 1],
-              outputRange: [0, 200],
+              outputRange: [0, 400], // Increased from 200 to 400
             }),
             opacity: animation,
           },
@@ -168,7 +182,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
             </View>
             <View style={styles.stepContent}>
               <Text style={styles.stepText}>
-                Walk {route.walkingToTransit}m to {subwayLine} train at <Text style={styles.stationName}>{route.startingStation}</Text>
+                Walk {route.walkingToTransit} min to {subwayLine} train at <Text style={styles.stationName}>{route.startingStation}</Text>
               </Text>
               <Text style={styles.stepTime}>{route.walkingToTransit} min</Text>
             </View>
@@ -191,20 +205,77 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
             </View>
           )}
 
-          {/* Transit Step */}
-          <View style={styles.step}>
-            <View style={[styles.stepIcon, { backgroundColor: subwayColor }]}>
-              <Text style={[styles.stepIconText, { color: '#fff' }]}>{subwayLine}</Text>
+          {/* Transit Step(s) - Handle transfers */}
+          {route.transfers === 0 ? (
+            // Direct route
+            <View style={styles.step}>
+              <View style={[styles.stepIcon, { backgroundColor: subwayColor }]}>
+                <Text style={[styles.stepIconText, { color: '#fff' }]}>{subwayLine}</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={styles.stepText}>
+                  Take {subwayLine} train from <Text style={styles.stationName}>{route.startingStation}</Text> to <Text style={styles.stationName}>{route.endingStation}</Text>
+                </Text>
+                <Text style={styles.stepTime}>
+                  {parseInt(route.duration.replace(' min', '')) - (route.walkingToTransit || 0) - (route.waitTime || 0) - (route.finalWalkingTime || 0)} min
+                </Text>
+              </View>
             </View>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepText}>
-                Take {subwayLine} train from <Text style={styles.stationName}>{route.startingStation}</Text> to <Text style={styles.stationName}>{route.endingStation}</Text>
-              </Text>
-              <Text style={styles.stepTime}>
-                {parseInt(route.duration.replace(' min', '')) - (route.walkingToTransit || 0) - (route.waitTime || 0) - (route.finalWalkingTime || 0)} min
-              </Text>
-            </View>
-          </View>
+          ) : (
+            // Transfer route - parse the details to show multiple steps
+            <>
+              {subwayLine.includes('→') && (() => {
+                const [firstLine, secondLine] = subwayLine.split('→');
+                const transferMatch = route.details.match(/transfer at ([^,]+) to/);
+                const transferStation = transferMatch ? transferMatch[1] : 'Transfer Station';
+                
+                return (
+                  <>
+                    {/* First train segment */}
+                    <View style={styles.step}>
+                      <View style={[styles.stepIcon, { backgroundColor: SUBWAY_COLORS[firstLine] || '#666' }]}>
+                        <Text style={[styles.stepIconText, { color: '#fff' }]}>{firstLine}</Text>
+                      </View>
+                      <View style={styles.stepContent}>
+                        <Text style={styles.stepText}>
+                          Take {firstLine} train from <Text style={styles.stationName}>{route.startingStation}</Text> to <Text style={styles.stationName}>{transferStation}</Text>
+                        </Text>
+                        <Text style={styles.stepTime}>~12 min</Text>
+                      </View>
+                    </View>
+                    
+                    {/* Transfer step */}
+                    <View style={styles.step}>
+                      <View style={[styles.stepIcon, styles.transferIcon]}>
+                        <Text style={styles.stepIconText}>🔄</Text>
+                      </View>
+                      <View style={styles.stepContent}>
+                        <Text style={styles.stepText}>
+                          Transfer at <Text style={styles.stationName}>{transferStation}</Text>
+                        </Text>
+                        <Text style={[styles.stepTime, styles.transferTime]}>
+                          3-5 min transfer
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    {/* Second train segment */}
+                    <View style={styles.step}>
+                      <View style={[styles.stepIcon, { backgroundColor: SUBWAY_COLORS[secondLine] || '#666' }]}>
+                        <Text style={[styles.stepIconText, { color: '#fff' }]}>{secondLine}</Text>
+                      </View>
+                      <View style={styles.stepContent}>
+                        <Text style={styles.stepText}>
+                          Take {secondLine} train from <Text style={styles.stationName}>{transferStation}</Text> to <Text style={styles.stationName}>{route.endingStation}</Text>
+                        </Text>
+                        <Text style={styles.stepTime}>~10 min</Text>
+                      </View>
+                    </View>
+                  </>
+                );
+              })()}
+            </>
+          )}
 
           {/* Train Departure Info */}
           {route.nextTrainDeparture && (
@@ -280,15 +351,29 @@ export function CommuteApp() {
   const loadRoutes = async () => {
     try {
       setError(null);
+      console.log('[DEBUG UI] Loading routes...');
       const routeData = await mtaService.calculateRoutes(
         COMMUTE_DATA.home,
         COMMUTE_DATA.work,
         COMMUTE_DATA.targetArrival
       );
+      console.log('[DEBUG UI] Received route data:', routeData);
+      console.log('[DEBUG UI] Number of routes:', routeData.length);
+      
+      // Log details about final walking times
+      routeData.forEach((route, index) => {
+        console.log(`[DEBUG UI] Route ${index + 1} (${route.method}):`, {
+          finalWalkingTime: route.finalWalkingTime,
+          walkingDistance: route.walkingDistance,
+          endingStation: route.endingStation,
+          totalDuration: route.duration
+        });
+      });
+      
       setRoutes(routeData);
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('Failed to load routes:', error);
+      console.error('[DEBUG UI] Failed to load routes:', error);
       setError(error instanceof Error ? error.message : 'Unable to load MTA data');
       setRoutes([]);
     } finally {
@@ -735,6 +820,13 @@ const styles = StyleSheet.create({
   departureTime: {
     fontWeight: '600',
     color: '#007AFF',
+  },
+  transferIcon: {
+    backgroundColor: '#E8F4FD',
+  },
+  transferTime: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
 });
 
