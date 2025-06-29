@@ -40,7 +40,7 @@ describe('CommuteApp', () => {
     render(<CommuteApp />);
     
     const container = screen.getByTestId('app-container');
-    expect(container).toHaveStyle({ backgroundColor: '#f8f9fa' });
+    expect(container).toHaveStyle({ backgroundColor: '#F8F9FA' });
   });
 
   test('shouldSupportPullToRefresh', () => {

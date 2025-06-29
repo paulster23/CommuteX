@@ -1,32 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-
-// NYC Subway line colors (official MTA colors)
-const SUBWAY_COLORS: { [key: string]: string } = {
-  'R': '#FCCC0A', // Yellow
-  'F': '#FF6319', // Orange
-  '4': '#00933C', // Green
-  '6': '#00933C', // Green
-  'N': '#FCCC0A', // Yellow
-  'Q': '#FCCC0A', // Yellow
-  'W': '#FCCC0A', // Yellow
-  'B': '#FF6319', // Orange
-  'D': '#FF6319', // Orange
-  'M': '#FF6319', // Orange
-  'G': '#6CBE45', // Light Green
-  'L': '#A7A9AC', // Gray
-  'A': '#0039A6', // Blue
-  'C': '#0039A6', // Blue
-  'E': '#0039A6', // Blue
-  'J': '#996633', // Brown
-  'Z': '#996633', // Brown
-  '1': '#EE352E', // Red
-  '2': '#EE352E', // Red
-  '3': '#EE352E', // Red
-  '5': '#00933C', // Green
-  '7': '#B933AD', // Purple
-  'S': '#808183', // Gray
-};
+import { colors } from '../design/theme';
 
 interface TransferRouteIconProps {
   routeLine: string;
@@ -40,7 +14,7 @@ export function TransferRouteIcon({ routeLine }: TransferRouteIconProps) {
     return (
       <View 
         testID="subway-icon"
-        style={[styles.subwayIcon, { backgroundColor: SUBWAY_COLORS[routeLine] || '#666' }]}
+        style={[styles.subwayIcon, { backgroundColor: colors.subway[routeLine as keyof typeof colors.subway] || '#666' }]}
       >
         <Text style={styles.subwayIconText}>{routeLine}</Text>
       </View>
@@ -54,14 +28,14 @@ export function TransferRouteIcon({ routeLine }: TransferRouteIconProps) {
     <View style={styles.transferContainer}>
       <View 
         testID="subway-icon"
-        style={[styles.subwayIcon, { backgroundColor: SUBWAY_COLORS[firstLine] || '#666' }]}
+        style={[styles.subwayIcon, { backgroundColor: colors.subway[firstLine as keyof typeof colors.subway] || '#666' }]}
       >
         <Text testID={`subway-icon-${firstLine}`} style={styles.subwayIconText}>{firstLine}</Text>
       </View>
       <Text style={styles.transferArrow}>→</Text>
       <View 
         testID="subway-icon"
-        style={[styles.subwayIcon, { backgroundColor: SUBWAY_COLORS[secondLine] || '#666' }]}
+        style={[styles.subwayIcon, { backgroundColor: colors.subway[secondLine as keyof typeof colors.subway] || '#666' }]}
       >
         <Text testID={`subway-icon-${secondLine}`} style={styles.subwayIconText}>{secondLine}</Text>
       </View>

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Animated, useColorScheme } from 'react-native';
+import { Clock, ArrowDown, ArrowUp, Zap, Calendar } from 'lucide-react-native';
 import { RealMTAService, Route } from '../services/RealMTAService';
 import { TransferRouteIcon } from './TransferRouteIcon';
+import { getThemeStyles } from '../design/components';
+import { colors } from '../design/theme';
 
 const COMMUTE_DATA = {
   home: '42 Woodhull St, Brooklyn',
@@ -10,31 +13,7 @@ const COMMUTE_DATA = {
 };
 
 // NYC Subway line colors (official MTA colors)
-const SUBWAY_COLORS: { [key: string]: string } = {
-  'R': '#FCCC0A', // Yellow
-  'F': '#FF6319', // Orange
-  '4': '#00933C', // Green
-  '6': '#00933C', // Green
-  'N': '#FCCC0A', // Yellow
-  'Q': '#FCCC0A', // Yellow
-  'W': '#FCCC0A', // Yellow
-  'B': '#FF6319', // Orange
-  'D': '#FF6319', // Orange
-  'M': '#FF6319', // Orange
-  'G': '#6CBE45', // Light Green
-  'L': '#A7A9AC', // Gray
-  'A': '#0039A6', // Blue
-  'C': '#0039A6', // Blue
-  'E': '#0039A6', // Blue
-  'J': '#996633', // Brown
-  'Z': '#996633', // Brown
-  '1': '#EE352E', // Red
-  '2': '#EE352E', // Red
-  '3': '#EE352E', // Red
-  '5': '#00933C', // Green
-  '7': '#B933AD', // Purple
-  'S': '#808183', // Gray
-};
+// Subway colors moved to design system
 
 interface RouteCardProps {
   route: Route;
@@ -45,6 +24,9 @@ interface RouteCardProps {
 
 function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps) {
   const [animation] = useState(new Animated.Value(0));
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
+  const styles = getThemeStyles(isDarkMode);
   
   // Debug logging for final walking step
   console.log(`[DEBUG RouteCard] Route ${route.id} final walking data:`, {
@@ -74,7 +56,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
   };
 
   const getSubwayColor = (line: string): string => {
-    return SUBWAY_COLORS[line] || '#666';
+    return colors.subway[line as keyof typeof colors.subway] || styles.theme.colors.textSecondary;
   };
 
   const getCountdownMinutes = (): number => {
@@ -105,53 +87,57 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
   return (
     <TouchableOpacity 
       style={[
-        styles.routeCard,
-        isBestRoute && styles.bestRouteCard,
-        { shadowColor: subwayColor }
+        styles.routeCard.container,
+        isBestRoute && { borderWidth: 2, borderColor: styles.theme.colors.success }
       ]}
       onPress={onToggle}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
       {/* Main Route Info */}
-      <View style={styles.routeHeader}>
-        <View style={styles.routeMainInfo}>
-          {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
-          <View style={styles.routeTextInfo}>
-            <Text style={styles.routeTitle}>
+      <View style={styles.routeCard.header}>
+        <View style={styles.routeCard.mainInfo}>
+          <View style={[styles.routeCard.iconContainer, { backgroundColor: subwayColor }]}>
+            {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
+          </View>
+          <View style={styles.routeCard.textInfo}>
+            <Text style={styles.routeCard.title}>
               {route.method.replace(' + Walk', '')}
             </Text>
-            <Text style={styles.routeSubtitle}>
+            <Text style={styles.routeCard.subtitle}>
               {(route.transfers ?? 0) === 0 ? 'Direct' : `${route.transfers} transfer${(route.transfers ?? 0) > 1 ? 's' : ''}`}
             </Text>
           </View>
         </View>
         
-        <View style={styles.routeTimeInfo}>
-          <Text style={styles.arrivalTime}>{route.arrivalTime}</Text>
-          <Text style={styles.totalDuration}>{route.duration}</Text>
+        <View style={styles.routeCard.timeInfo}>
+          <Text style={styles.routeCard.arrivalTime}>{route.arrivalTime}</Text>
+          <Text style={styles.routeCard.duration}>{route.duration}</Text>
           {route.isRealTimeData ? (
-            <View style={styles.liveIndicator}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveText}>LIVE</Text>
+            <View style={[styles.indicator.container, styles.indicator.live]}>
+              <View style={[styles.indicator.dot, styles.indicator.liveDot]} />
+              <Text style={[styles.indicator.text, styles.indicator.liveText]}>LIVE</Text>
             </View>
           ) : (
-            <View style={styles.calculatedIndicator}>
-              <View style={styles.calculatedDot} />
-              <Text style={styles.calculatedText}>ESTIMATED</Text>
+            <View style={[styles.indicator.container, styles.indicator.estimated]}>
+              <View style={[styles.indicator.dot, styles.indicator.estimatedDot]} />
+              <Text style={[styles.indicator.text, styles.indicator.estimatedText]}>ESTIMATED</Text>
             </View>
           )}
         </View>
       </View>
 
       {/* Countdown Timer */}
-      <View style={styles.countdownContainer}>
-        <Text style={styles.countdownText}>
-          {countdownMinutes > 0 ? `Departs in ${countdownMinutes}m` : 'Departing now'}
-        </Text>
-        <View style={[styles.countdownBar, { backgroundColor: subwayColor + '20' }]}>
+      <View style={styles.routeCard.countdownContainer}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+          <Clock size={14} color={styles.theme.colors.primary} style={{ marginRight: 6 }} />
+          <Text style={styles.routeCard.countdownText}>
+            {countdownMinutes > 0 ? `Departs in ${countdownMinutes}m` : 'Departing now'}
+          </Text>
+        </View>
+        <View style={styles.routeCard.countdownBar}>
           <View 
             style={[
-              styles.countdownProgress, 
+              styles.routeCard.countdownProgress, 
               { 
                 backgroundColor: subwayColor,
                 width: `${Math.max(10, Math.min(100, (30 - countdownMinutes) / 30 * 100))}%`
@@ -164,7 +150,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
       {/* Expandable Details */}
       <Animated.View
         style={[
-          styles.expandableContent,
+          { overflow: 'hidden' },
           {
             maxHeight: animation.interpolate({
               inputRange: [0, 1],
@@ -174,33 +160,33 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
           },
         ]}
       >
-        <View style={styles.routeSteps}>
-          <Text style={styles.stepsTitle}>Step-by-step directions:</Text>
+        <View style={{ paddingVertical: 16, borderTopWidth: 1, borderTopColor: styles.theme.colors.borderLight }}>
+          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 12, color: styles.theme.colors.text }}>Step-by-step directions:</Text>
           
           {/* Walking Step */}
-          <View style={styles.step}>
-            <View style={styles.stepIcon}>
-              <Text style={styles.stepIconText}>🚶</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: styles.theme.colors.borderLight, marginRight: 12 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600' }}>🚶</Text>
             </View>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepText}>
-                Walk {route.walkingToTransit} min to {subwayLine} train at <Text style={styles.stationName}>{route.startingStation}</Text>
+            <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
+                Walk {route.walkingToTransit} min to {subwayLine} train at <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
               </Text>
-              <Text style={styles.stepTime}>{route.walkingToTransit} min</Text>
+              <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>{route.walkingToTransit} min</Text>
             </View>
           </View>
 
           {/* Wait Step */}
           {route.waitTime && route.waitTime > 0 && (
-            <View style={styles.step}>
-              <View style={[styles.stepIcon, styles.waitIcon]}>
-                <Text style={styles.stepIconText}>⏱️</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF3CD', marginRight: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600' }}>⏱️</Text>
               </View>
-              <View style={styles.stepContent}>
-                <Text style={styles.stepText}>
-                  Wait for next {subwayLine} train at <Text style={styles.stationName}>{route.startingStation}</Text>
+              <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
+                  Wait for next {subwayLine} train at <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
                 </Text>
-                <Text style={[styles.stepTime, styles.waitTime]}>
+                <Text style={{ fontSize: 12, color: '#FF6B35', fontWeight: '600' }}>
                   {route.waitTime} min wait
                 </Text>
               </View>
@@ -210,15 +196,15 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
           {/* Transit Step(s) - Handle transfers */}
           {route.transfers === 0 ? (
             // Direct route
-            <View style={styles.step}>
-              <View style={[styles.stepIcon, { backgroundColor: subwayColor }]}>
-                <Text style={[styles.stepIconText, { color: '#fff' }]}>{subwayLine}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: subwayColor, marginRight: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#fff' }}>{subwayLine}</Text>
               </View>
-              <View style={styles.stepContent}>
-                <Text style={styles.stepText}>
-                  Take {subwayLine} train from <Text style={styles.stationName}>{route.startingStation}</Text> to <Text style={styles.stationName}>{route.endingStation}</Text>
+              <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
+                  Take {subwayLine} train from <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text> to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
                 </Text>
-                <Text style={styles.stepTime}>
+                <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>
                   {parseInt(route.duration.replace(' min', '')) - (route.walkingToTransit || 0) - (route.waitTime || 0) - (route.finalWalkingTime || 0)} min
                 </Text>
               </View>
@@ -234,43 +220,43 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                 return (
                   <>
                     {/* First train segment */}
-                    <View style={styles.step}>
-                      <View style={[styles.stepIcon, { backgroundColor: SUBWAY_COLORS[firstLine] || '#666' }]}>
-                        <Text style={[styles.stepIconText, { color: '#fff' }]}>{firstLine}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.subway[firstLine] || styles.theme.colors.textSecondary, marginRight: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#fff' }}>{firstLine}</Text>
                       </View>
-                      <View style={styles.stepContent}>
-                        <Text style={styles.stepText}>
-                          Take {firstLine} train from <Text style={styles.stationName}>{route.startingStation}</Text> to <Text style={styles.stationName}>{transferStation}</Text>
+                      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
+                          Take {firstLine} train from <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text> to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text>
                         </Text>
-                        <Text style={styles.stepTime}>~12 min</Text>
+                        <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>~12 min</Text>
                       </View>
                     </View>
                     
                     {/* Transfer step */}
-                    <View style={styles.step}>
-                      <View style={[styles.stepIcon, styles.transferIcon]}>
-                        <Text style={styles.stepIconText}>🔄</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#E8F4FD', marginRight: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600' }}>🔄</Text>
                       </View>
-                      <View style={styles.stepContent}>
-                        <Text style={styles.stepText}>
-                          Transfer at <Text style={styles.stationName}>{transferStation}</Text>
+                      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
+                          Transfer at <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text>
                         </Text>
-                        <Text style={[styles.stepTime, styles.transferTime]}>
+                        <Text style={{ fontSize: 12, color: styles.theme.colors.primary, fontWeight: '600' }}>
                           30 sec walk
                         </Text>
                       </View>
                     </View>
                     
                     {/* Second train segment */}
-                    <View style={styles.step}>
-                      <View style={[styles.stepIcon, { backgroundColor: SUBWAY_COLORS[secondLine] || '#666' }]}>
-                        <Text style={[styles.stepIconText, { color: '#fff' }]}>{secondLine}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.subway[secondLine] || styles.theme.colors.textSecondary, marginRight: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#fff' }}>{secondLine}</Text>
                       </View>
-                      <View style={styles.stepContent}>
-                        <Text style={styles.stepText}>
-                          Take {secondLine} train from <Text style={styles.stationName}>{transferStation}</Text> to <Text style={styles.stationName}>{route.endingStation}</Text>
+                      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
+                          Take {secondLine} train from <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text> to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
                         </Text>
-                        <Text style={styles.stepTime}>~10 min</Text>
+                        <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>~10 min</Text>
                       </View>
                     </View>
                   </>
@@ -281,24 +267,24 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
 
           {/* Train Departure Info */}
           {route.nextTrainDeparture && (
-            <View style={styles.trainInfo}>
-              <Text style={styles.trainInfoText}>
-                Next {subwayLine} train departs: <Text style={styles.departureTime}>{route.nextTrainDeparture}</Text>
+            <View style={{ backgroundColor: styles.theme.colors.surfaceSecondary, padding: 12, borderRadius: 8, marginTop: 8, marginBottom: 8 }}>
+              <Text style={{ fontSize: 13, color: styles.theme.colors.textSecondary, textAlign: 'center' }}>
+                Next {subwayLine} train departs: <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.nextTrainDeparture}</Text>
               </Text>
             </View>
           )}
 
           {/* Final Walking Step */}
           {(route.walkingDistance || route.finalWalkingTime) && (
-            <View style={styles.step}>
-              <View style={styles.stepIcon}>
-                <Text style={styles.stepIconText}>🚶</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: styles.theme.colors.borderLight, marginRight: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600' }}>🚶</Text>
               </View>
-              <View style={styles.stepContent}>
-                <Text style={styles.stepText}>
-                  Walk to destination from <Text style={styles.stationName}>{route.endingStation}</Text>
+              <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
+                  Walk to destination from <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
                 </Text>
-                <Text style={styles.stepTime}>
+                <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>
                   {route.finalWalkingTime ? `${route.finalWalkingTime} min` : route.walkingDistance}
                 </Text>
               </View>
@@ -307,9 +293,9 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
         </View>
 
         {/* Confidence & Additional Info */}
-        <View style={styles.additionalInfo}>
+        <View style={{ paddingTop: 12, borderTopWidth: 1, borderTopColor: styles.theme.colors.borderLight }}>
           {route.confidence && (
-            <Text style={styles.confidenceText}>
+            <Text style={{ fontSize: 12, color: styles.theme.colors.textTertiary, fontStyle: 'italic' }}>
               Confidence: {route.confidence}
             </Text>
           )}
@@ -317,13 +303,15 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
       </Animated.View>
 
       {/* Expand/Collapse Indicator */}
-      <View style={styles.expandIndicator}>
-        <Text style={styles.expandText}>
+      <View style={styles.routeCard.expandButton}>
+        <Text style={styles.routeCard.expandText}>
           {isExpanded ? 'Less details' : 'More details'}
         </Text>
-        <Text style={styles.expandArrow}>
-          {isExpanded ? '▲' : '▼'}
-        </Text>
+        {isExpanded ? (
+          <ArrowUp size={16} color={styles.theme.colors.primary} />
+        ) : (
+          <ArrowDown size={16} color={styles.theme.colors.primary} />
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -332,6 +320,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
 export function CommuteApp() {
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
+  const styles = getThemeStyles(isDarkMode);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -400,79 +389,78 @@ export function CommuteApp() {
     setExpandedRoutes(newExpanded);
   };
 
-  const themeStyles = isDarkMode ? darkStyles : lightStyles;
-
   return (
     <View 
       testID="app-container"
-      style={[styles.container, themeStyles.container]}
+      style={{ flex: 1, backgroundColor: styles.theme.colors.background }}
     >
       {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={[styles.title, themeStyles.text]}>Morning Commute</Text>
-          <Text style={[styles.subtitle, themeStyles.subtitleText]}>
-            {COMMUTE_DATA.home.split(',')[0]} → {COMMUTE_DATA.work.split(',')[0]}
-          </Text>
-        </View>
+      <View style={styles.header.container}>
+        <Text style={styles.header.title}>Morning Commute</Text>
+        <Text style={styles.header.subtitle}>
+          {COMMUTE_DATA.home.split(',')[0]} → {COMMUTE_DATA.work.split(',')[0]}
+        </Text>
       </View>
       
       <ScrollView
         testID="scroll-view"
-        style={styles.scrollView}
+        style={{ flex: 1, paddingHorizontal: 20 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#007AFF"
-            colors={['#007AFF']}
+            tintColor={styles.theme.colors.primary}
+            colors={[styles.theme.colors.primary]}
           />
         }
       >
         {/* Status Bar */}
-        <View style={[styles.statusBar, themeStyles.statusBar]}>
-          <Text style={[styles.statusText, themeStyles.statusText]}>
-            Last updated: {lastUpdated.toLocaleTimeString()}
-          </Text>
-          <View style={styles.liveIndicator}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LIVE</Text>
+        <View style={styles.statusBar.container}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Calendar size={14} color={styles.theme.colors.textSecondary} style={{ marginRight: 6 }} />
+            <Text style={styles.statusBar.text}>
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </Text>
+          </View>
+          <View style={[styles.indicator.container, styles.indicator.live]}>
+            <Zap size={12} color={styles.theme.colors.success} style={{ marginRight: 4 }} />
+            <Text style={[styles.indicator.text, styles.indicator.liveText]}>LIVE</Text>
           </View>
         </View>
 
         {/* Routes */}
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={[styles.loading, themeStyles.text]}>
+          <View style={styles.state.loadingContainer}>
+            <Text style={styles.state.loadingText}>
               Loading real-time MTA data...
             </Text>
           </View>
         ) : error ? (
-          <View style={[styles.errorContainer, themeStyles.errorContainer]}>
-            <Text style={styles.errorTitle}>⚠️ MTA Data Unavailable</Text>
-            <Text style={styles.errorMessage}>{error}</Text>
+          <View style={styles.state.errorContainer}>
+            <Text style={styles.state.errorTitle}>⚠️ MTA Data Unavailable</Text>
+            <Text style={styles.state.errorMessage}>{error}</Text>
             <TouchableOpacity 
-              style={styles.retryButton}
+              style={styles.button.primary}
               onPress={loadRoutes}
             >
-              <Text style={styles.retryButtonText}>Retry</Text>
+              <Text style={styles.button.primaryText}>Retry</Text>
             </TouchableOpacity>
-            <Text style={styles.errorHelp}>
+            <Text style={styles.state.errorHelp}>
               This app only shows real MTA data. No mock or fallback data is displayed.
             </Text>
           </View>
         ) : routes.length === 0 ? (
-          <View style={[styles.errorContainer, themeStyles.errorContainer]}>
-            <Text style={styles.errorTitle}>No Routes Available</Text>
-            <Text style={styles.errorMessage}>
+          <View style={styles.state.errorContainer}>
+            <Text style={styles.state.errorTitle}>No Routes Available</Text>
+            <Text style={styles.state.errorMessage}>
               No real-time route data available for your commute at this time.
             </Text>
             <TouchableOpacity 
-              style={styles.retryButton}
+              style={styles.button.primary}
               onPress={loadRoutes}
             >
-              <Text style={styles.retryButtonText}>Retry</Text>
+              <Text style={styles.button.primaryText}>Retry</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -489,9 +477,9 @@ export function CommuteApp() {
 
         {/* Service Alerts Section */}
         {routes.length > 0 && (
-          <View style={[styles.alertsSection, themeStyles.alertsSection]}>
-            <Text style={[styles.alertsTitle, themeStyles.text]}>Service Alerts</Text>
-            <Text style={[styles.alertsMessage, themeStyles.subtitleText]}>
+          <View style={[styles.card(), { marginTop: 20, marginBottom: 40 }]}>
+            <Text style={{ color: styles.theme.colors.text, fontSize: 18, fontWeight: '600', marginBottom: 8 }}>Service Alerts</Text>
+            <Text style={{ color: styles.theme.colors.textSecondary, fontSize: 14 }}>
               No active service alerts for this route
             </Text>
           </View>
@@ -501,372 +489,4 @@ export function CommuteApp() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 16,
-    marginTop: 4,
-    opacity: 0.7,
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  statusBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  statusText: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  liveIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF3B30',
-    marginRight: 6,
-  },
-  liveText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FF3B30',
-  },
-  calculatedIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  calculatedDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF9500', // Orange to distinguish from red live indicator
-    marginRight: 6,
-  },
-  calculatedText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FF9500',
-  },
-  routeCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  bestRouteCard: {
-    borderWidth: 2,
-    borderColor: '#34C759',
-    shadowOpacity: 0.15,
-  },
-  routeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  routeMainInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  subwayIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  subwayIconText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000',
-  },
-  routeTextInfo: {
-    flex: 1,
-  },
-  routeTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  routeSubtitle: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  routeTimeInfo: {
-    alignItems: 'flex-end',
-  },
-  arrivalTime: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  totalDuration: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginBottom: 4,
-  },
-  countdownContainer: {
-    marginBottom: 16,
-  },
-  countdownText: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-    color: '#007AFF',
-  },
-  countdownBar: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  countdownProgress: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  expandableContent: {
-    overflow: 'hidden',
-  },
-  routeSteps: {
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  stepsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  step: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  stepIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    marginRight: 12,
-  },
-  stepIconText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  stepContent: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  stepText: {
-    fontSize: 14,
-    flex: 1,
-  },
-  stepTime: {
-    fontSize: 12,
-    opacity: 0.7,
-    fontWeight: '500',
-  },
-  additionalInfo: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  confidenceText: {
-    fontSize: 12,
-    opacity: 0.7,
-    fontStyle: 'italic',
-  },
-  expandIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 12,
-  },
-  expandText: {
-    fontSize: 14,
-    color: '#007AFF',
-    marginRight: 6,
-  },
-  expandArrow: {
-    fontSize: 12,
-    color: '#007AFF',
-  },
-  loadingContainer: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  loading: {
-    fontSize: 16,
-    opacity: 0.7,
-  },
-  errorContainer: {
-    backgroundColor: '#fff3cd',
-    borderColor: '#ffeaa7',
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#856404',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  errorMessage: {
-    fontSize: 14,
-    color: '#856404',
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  errorHelp: {
-    fontSize: 12,
-    color: '#6c757d',
-    textAlign: 'center',
-    marginTop: 12,
-    fontStyle: 'italic',
-  },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  alertsSection: {
-    padding: 20,
-    borderRadius: 16,
-    marginTop: 20,
-    marginBottom: 40,
-  },
-  alertsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  alertsMessage: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  stationName: {
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  waitIcon: {
-    backgroundColor: '#FFF3CD',
-  },
-  waitTime: {
-    color: '#FF6B35',
-    fontWeight: '600',
-  },
-  trainInfo: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  trainInfoText: {
-    fontSize: 13,
-    color: '#666',
-    textAlign: 'center',
-  },
-  departureTime: {
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  transferIcon: {
-    backgroundColor: '#E8F4FD',
-  },
-  transferTime: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-});
-
-const lightStyles = StyleSheet.create({
-  container: {
-    backgroundColor: '#f8f9fa',
-  },
-  text: {
-    color: '#000',
-  },
-  subtitleText: {
-    color: '#666',
-  },
-  statusText: {
-    color: '#666',
-  },
-  statusBar: {
-    backgroundColor: '#fff',
-  },
-  errorContainer: {
-    backgroundColor: '#fff3cd',
-  },
-  alertsSection: {
-    backgroundColor: '#fff',
-  },
-});
-
-const darkStyles = StyleSheet.create({
-  container: {
-    backgroundColor: '#000',
-  },
-  text: {
-    color: '#fff',
-  },
-  subtitleText: {
-    color: '#999',
-  },
-  statusText: {
-    color: '#999',
-  },
-  statusBar: {
-    backgroundColor: '#1c1c1e',
-  },
-  errorContainer: {
-    backgroundColor: '#2c2c2e',
-  },
-  alertsSection: {
-    backgroundColor: '#1c1c1e',
-  },
-});
+// Styles now handled by modern design system in ../design/
