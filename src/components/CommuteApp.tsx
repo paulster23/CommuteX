@@ -75,26 +75,27 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
       {/* Main Route Info */}
       <View style={styles.routeCard.header}>
         <View style={styles.routeCard.mainInfo}>
-          <View 
-            testID="route-icon-container"
-            style={[
-              styles.routeCard.iconContainer, 
-              // Only apply background color for single routes, not transfers
-              !subwayLine.includes('→') && { backgroundColor: subwayColor }
-            ]}
-          >
-            {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
-          </View>
-          <View style={styles.routeCard.textInfo}>
+          <View style={{ alignItems: 'center' }}>
+            <View 
+              testID="route-icon-container"
+              style={[
+                styles.routeCard.iconContainer, 
+                // Only apply background color for single routes, not transfers
+                !subwayLine.includes('→') && { backgroundColor: subwayColor }
+              ]}
+            >
+              {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
+            </View>
+            {/* Transfer pill moved under train logos */}
             <View style={{
               backgroundColor: (route.transfers ?? 0) === 0 ? styles.theme.colors.success + '20' : styles.theme.colors.warning + '20',
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 16,
-              alignSelf: 'flex-start'
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 12,
+              marginTop: 6
             }}>
               <Text style={{
-                fontSize: 12,
+                fontSize: 10,
                 fontWeight: '600',
                 color: (route.transfers ?? 0) === 0 ? styles.theme.colors.success : styles.theme.colors.warning
               }}>
@@ -102,11 +103,13 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
               </Text>
             </View>
           </View>
+          <View style={styles.routeCard.textInfo}>
+          </View>
         </View>
         
         <View testID="time-info-container" style={[styles.routeCard.timeInfo, { paddingRight: 4 }]}>
-          <Text style={styles.routeCard.arrivalTime}>{route.arrivalTime}</Text>
-          <Text style={styles.routeCard.duration}>{route.duration}</Text>
+          <Text style={[styles.routeCard.arrivalTime, { fontSize: 16 }]}>{route.arrivalTime}</Text>
+          <Text style={[styles.routeCard.duration, { fontSize: 11 }]}>{route.duration}</Text>
           {route.isRealTimeData ? (
             <View style={[styles.indicator.container, styles.indicator.live]}>
               <View style={[styles.indicator.dot, styles.indicator.liveDot]} />
@@ -144,32 +147,31 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
             borderTopColor: styles.theme.colors.borderLight 
           }}
         >
-          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 12, color: styles.theme.colors.text }}>Step-by-step directions:</Text>
           
           {/* Walking Step */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-            <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: styles.theme.colors.borderLight, marginRight: 12 }}>
-              <Text style={{ fontSize: 12, fontWeight: '600' }}>🚶</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: styles.theme.colors.borderLight, marginRight: 10 }}>
+              <Text style={{ fontSize: 10, fontWeight: '600' }}>🚶</Text>
             </View>
             <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+              <Text style={{ fontSize: 13, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
                 <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
               </Text>
-              <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>{route.walkingToTransit} min</Text>
+              <Text style={{ fontSize: 11, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>{route.walkingToTransit} min</Text>
             </View>
           </View>
 
           {/* Wait Step */}
           {route.waitTime && route.waitTime > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF3CD', marginRight: 12 }}>
-                <Text style={{ fontSize: 12, fontWeight: '600' }}>⏱️</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <View style={{ width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF3CD', marginRight: 10 }}>
+                <Text style={{ fontSize: 10, fontWeight: '600' }}>⏱️</Text>
               </View>
               <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+                <Text style={{ fontSize: 13, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
                   Wait at <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
                 </Text>
-                <Text style={{ fontSize: 12, color: '#FF6B35', fontWeight: '600', marginRight: 8 }}>
+                <Text style={{ fontSize: 11, color: '#FF6B35', fontWeight: '600', marginRight: 8 }}>
                   {route.waitTime} min wait
                 </Text>
               </View>
@@ -251,7 +253,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
           {/* Train Departure Info */}
           {route.nextTrainDeparture && (
             <View style={{ backgroundColor: styles.theme.colors.surfaceSecondary, padding: 12, borderRadius: 8, marginTop: 8, marginBottom: 8 }}>
-              <Text style={{ fontSize: 13, color: styles.theme.colors.textSecondary, textAlign: 'center' }}>
+              <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, textAlign: 'center' }}>
                 Next train: <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.nextTrainDeparture}</Text>
               </Text>
             </View>
@@ -392,21 +394,21 @@ export function CommuteApp() {
     >
       {/* Header */}
       <View style={styles.header.container}>
-        <View>
-          <Text style={styles.header.title}>Morning Commute</Text>
-          <Text style={styles.header.subtitle}>
-            {COMMUTE_DATA.home.split(',')[0]} → {COMMUTE_DATA.work.split(',')[0]}
-          </Text>
-        </View>
-        
-        {/* Compact Status Widget */}
-        <View testID="compact-status-widget" style={{ alignItems: 'flex-end' }}>
-          <View style={[styles.indicator.container, styles.indicator.live, { marginBottom: 4 }]}>
-            <Zap size={12} color={styles.theme.colors.success} style={{ marginRight: 4 }} />
-            <Text style={[styles.indicator.text, styles.indicator.liveText]}>LIVE</Text>
+        <View style={{ flex: 1 }}>
+          {/* LIVE Status moved above title */}
+          <View testID="compact-status-widget" style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <View style={[styles.indicator.container, styles.indicator.live, { marginRight: 8 }]}>
+              <Zap size={10} color={styles.theme.colors.success} style={{ marginRight: 4 }} />
+              <Text style={[styles.indicator.text, styles.indicator.liveText, { fontSize: 10 }]}>LIVE</Text>
+            </View>
+            <Text style={{ fontSize: 10, color: styles.theme.colors.textSecondary }}>
+              {lastUpdated.toLocaleTimeString()}
+            </Text>
           </View>
-          <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary }}>
-            {lastUpdated.toLocaleTimeString()}
+          
+          <Text style={[styles.header.title, { fontSize: 24 }]}>Morning Commute</Text>
+          <Text style={[styles.header.subtitle, { fontSize: 13 }]}>
+            {COMMUTE_DATA.home.split(',')[0]} → {COMMUTE_DATA.work.split(',')[0]}
           </Text>
         </View>
       </View>
