@@ -87,22 +87,6 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
             >
               {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
             </View>
-            {/* Transfer pill moved under train logos */}
-            <View style={{
-              backgroundColor: (route.transfers ?? 0) === 0 ? styles.theme.colors.success + '20' : styles.theme.colors.warning + '20',
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 12,
-              marginTop: 6
-            }}>
-              <Text style={{
-                fontSize: 10,
-                fontWeight: '600',
-                color: (route.transfers ?? 0) === 0 ? styles.theme.colors.success : styles.theme.colors.warning
-              }}>
-                {(route.transfers ?? 0) === 0 ? 'Direct' : `${route.transfers} transfer${(route.transfers ?? 0) > 1 ? 's' : ''}`}
-              </Text>
-            </View>
           </View>
           <View style={styles.routeCard.textInfo}>
           </View>
