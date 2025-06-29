@@ -175,7 +175,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                   <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
                 </Text>
                 <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>
-                  {parseInt(route.duration.replace(' min', '')) - (route.walkingToTransit || 0) - (route.waitTime || 0) - (route.finalWalkingTime || 0)} min
+                  {route.transitTime || (parseInt(route.duration.replace(' min', '')) - (route.walkingToTransit || 0) - (route.waitTime || 0) - (route.finalWalkingTime || 0))} min
                 </Text>
               </View>
             </View>
@@ -198,7 +198,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                         <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
                           <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text>
                         </Text>
-                        <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>~12 min</Text>
+                        <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>{route.firstTransitTime || 12} min</Text>
                       </View>
                     </View>
                     
@@ -212,7 +212,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                           <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text>
                         </Text>
                         <Text style={{ fontSize: 12, color: styles.theme.colors.primary, fontWeight: '600', marginRight: 8 }}>
-                          30 sec
+                          {route.transferWaitTime || 2} min
                         </Text>
                       </View>
                     </View>
@@ -226,7 +226,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                         <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
                           <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
                         </Text>
-                        <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>~10 min</Text>
+                        <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>{route.secondTransitTime || 10} min</Text>
                       </View>
                     </View>
                   </>
@@ -235,14 +235,6 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
             </>
           )}
 
-          {/* Train Departure Info */}
-          {route.nextTrainDeparture && (
-            <View style={{ backgroundColor: styles.theme.colors.surfaceSecondary, padding: 12, borderRadius: 8, marginTop: 8, marginBottom: 8 }}>
-              <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, textAlign: 'center' }}>
-                Next train: <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.nextTrainDeparture}</Text>
-              </Text>
-            </View>
-          )}
 
           {/* Final Walking Step */}
           {(route.walkingDistance || route.finalWalkingTime) && (
@@ -398,14 +390,6 @@ export function CommuteApp() {
         </View>
       </View>
 
-      {/* Train Departure Pills */}
-      {routes.length > 0 && routes[0].nextDepartures && (
-        <TrainDeparturePills 
-          departures={routes[0].nextDepartures} 
-          stationName={routes[0].startingStation || 'Station'} 
-        />
-      )}
-      
       <ScrollView
         testID="scroll-view"
         style={{ flex: 1, paddingHorizontal: 20 }}
@@ -419,6 +403,13 @@ export function CommuteApp() {
           />
         }
       >
+        {/* Train Departure Pills */}
+        {routes.length > 0 && routes[0].nextDepartures && (
+          <TrainDeparturePills 
+            departures={routes[0].nextDepartures} 
+            stationName={routes[0].startingStation || 'Station'} 
+          />
+        )}
 
         {/* Routes */}
         {loading ? (
