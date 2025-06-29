@@ -25,7 +25,8 @@
     "react-native": "0.79.4",
     "react-native-gesture-handler": "^2.26.0",
     "react-native-reanimated": "^3.18.0",
-    "react-native-web": "^0.20.0"
+    "react-native-web": "^0.20.0",
+    "@expo/metro-runtime": "~5.0.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
