@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Animated, useColorScheme } from 'react-native';
 import { RealMTAService, Route } from '../services/RealMTAService';
-<<<<<<< HEAD
 import { TransferRouteIcon } from './TransferRouteIcon';
-=======
->>>>>>> parent of 585503d (Elegant CommuteX UI Redesign with Liquid Glass Design)
 
 const COMMUTE_DATA = {
   home: '42 Woodhull St, Brooklyn',
@@ -118,15 +115,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
       {/* Main Route Info */}
       <View style={styles.routeHeader}>
         <View style={styles.routeMainInfo}>
-<<<<<<< HEAD
           {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
-=======
-          {subwayLine && (
-            <View style={[styles.subwayIcon, { backgroundColor: subwayColor }]}>
-              <Text style={styles.subwayIconText}>{subwayLine}</Text>
-            </View>
-          )}
->>>>>>> parent of 585503d (Elegant CommuteX UI Redesign with Liquid Glass Design)
           <View style={styles.routeTextInfo}>
             <Text style={styles.routeTitle}>
               {route.method.replace(' + Walk', '')}
@@ -140,10 +129,15 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
         <View style={styles.routeTimeInfo}>
           <Text style={styles.arrivalTime}>{route.arrivalTime}</Text>
           <Text style={styles.totalDuration}>{route.duration}</Text>
-          {route.isRealTimeData && (
+          {route.isRealTimeData ? (
             <View style={styles.liveIndicator}>
               <View style={styles.liveDot} />
               <Text style={styles.liveText}>LIVE</Text>
+            </View>
+          ) : (
+            <View style={styles.calculatedIndicator}>
+              <View style={styles.calculatedDot} />
+              <Text style={styles.calculatedText}>ESTIMATED</Text>
             </View>
           )}
         </View>
@@ -262,26 +256,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                           Transfer at <Text style={styles.stationName}>{transferStation}</Text>
                         </Text>
                         <Text style={[styles.stepTime, styles.transferTime]}>
-<<<<<<< HEAD
                           30 sec walk
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    {/* Wait for second train */}
-                    <View style={styles.step}>
-                      <View style={[styles.stepIcon, styles.waitIcon]}>
-                        <Text style={styles.stepIconText}>⏱️</Text>
-                      </View>
-                      <View style={styles.stepContent}>
-                        <Text style={styles.stepText}>
-                          Wait for next {secondLine} train at <Text style={styles.stationName}>{transferStation}</Text>
-                        </Text>
-                        <Text style={[styles.stepTime, styles.waitTime]}>
-                          ~{route.secondWaitTime || 5} min wait
-=======
-                          3-5 min transfer
->>>>>>> parent of 585503d (Elegant CommuteX UI Redesign with Liquid Glass Design)
                         </Text>
                       </View>
                     </View>
@@ -355,8 +330,9 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
 }
 
 export function CommuteApp() {
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
@@ -408,10 +384,6 @@ export function CommuteApp() {
     }
   };
 
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
-
   const onRefresh = async () => {
     setRefreshing(true);
     await loadRoutes();
@@ -443,15 +415,6 @@ export function CommuteApp() {
             {COMMUTE_DATA.home.split(',')[0]} → {COMMUTE_DATA.work.split(',')[0]}
           </Text>
         </View>
-        <TouchableOpacity 
-          testID="theme-toggle"
-          onPress={toggleTheme}
-          style={[styles.themeToggle, themeStyles.themeToggle]}
-        >
-          <Text style={styles.themeToggleText}>
-            {isDarkMode ? '☀️' : '🌙'}
-          </Text>
-        </TouchableOpacity>
       </View>
       
       <ScrollView
@@ -543,9 +506,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
@@ -559,16 +519,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 4,
     opacity: 0.7,
-  },
-  themeToggle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  themeToggleText: {
-    fontSize: 20,
   },
   scrollView: {
     flex: 1,
@@ -602,6 +552,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#FF3B30',
+  },
+  calculatedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  calculatedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF9500', // Orange to distinguish from red live indicator
+    marginRight: 6,
+  },
+  calculatedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF9500',
   },
   routeCard: {
     backgroundColor: '#fff',
@@ -873,9 +839,6 @@ const lightStyles = StyleSheet.create({
   statusBar: {
     backgroundColor: '#fff',
   },
-  themeToggle: {
-    backgroundColor: '#f0f0f0',
-  },
   errorContainer: {
     backgroundColor: '#fff3cd',
   },
@@ -899,9 +862,6 @@ const darkStyles = StyleSheet.create({
   },
   statusBar: {
     backgroundColor: '#1c1c1e',
-  },
-  themeToggle: {
-    backgroundColor: '#2c2c2e',
   },
   errorContainer: {
     backgroundColor: '#2c2c2e',

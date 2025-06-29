@@ -718,7 +718,7 @@ export class RealMTAService {
         transfers: 1,
         walkingDistance: mapping.finalWalkingDistance,
         walkingToTransit: walkingTime,
-        isRealTimeData: true,
+        isRealTimeData: false, // Transfer routes use calculated timings, not real-time data
         confidence: 'medium', // Transfer routes have medium confidence
         startingStation: mapping.startingStation,
         endingStation: mapping.endingStation,

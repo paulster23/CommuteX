@@ -269,8 +269,8 @@ describe('RealMTAService', () => {
       return fetchMethod('https://test-feed.com');
     };
 
-    // Mock fetch to return corrupted binary data
-    mockFetch.mockResolvedValueOnce({
+    // Mock fetch to return corrupted binary data for both attempts (original + retry)
+    const mockResponse = {
       ok: true,
       status: 200,
       statusText: 'OK',
@@ -282,7 +282,10 @@ describe('RealMTAService', () => {
         const corruptedData = new Uint8Array([0xFF, 0xFE, 0xFD, 0xFC, 0xFB]);
         return corruptedData.buffer;
       }
-    } as any);
+    } as any;
+    
+    mockFetch.mockResolvedValueOnce(mockResponse);
+    mockFetch.mockResolvedValueOnce(mockResponse); // For retry attempt
 
     await expect(testFetchGTFSFeed()).rejects.toThrow(/Failed to parse GTFS-RT data format/);
   });
@@ -360,8 +363,15 @@ describe('RealMTAService', () => {
         get: () => null
       },
       arrayBuffer: async () => {
-        // Mock valid GTFS data structure
-        const validData = new Uint8Array([0x0A, 0x00]); // Minimal valid protobuf
+        // Mock valid GTFS FeedMessage protobuf structure
+        // Based on the protobuf definition, a FeedMessage needs at least:
+        // field 1: header (required FeedHeader)
+        // FeedHeader needs field 1: gtfs_realtime_version (required string)
+        const validData = new Uint8Array([
+          0x0A, 0x04,       // field 1 (header), length 4
+          0x0A, 0x02,       // field 1 (gtfs_realtime_version), length 2  
+          0x32, 0x2E        // "2."
+        ]);
         return validData.buffer;
       }
     } as any);
@@ -378,7 +388,7 @@ describe('RealMTAService', () => {
       return fetchMethod('https://test-feed.com');
     };
 
-    mockFetch.mockResolvedValueOnce({
+    const mockResponse = {
       ok: true,
       status: 200,
       statusText: 'OK',
@@ -390,7 +400,10 @@ describe('RealMTAService', () => {
         const invalidProtobuf = new Uint8Array([0x04, 0x01]); // Invalid wire type 4
         return invalidProtobuf.buffer;
       }
-    } as any);
+    } as any;
+
+    mockFetch.mockResolvedValueOnce(mockResponse);
+    mockFetch.mockResolvedValueOnce(mockResponse); // For retry attempt
 
     try {
       await testFetchGTFSFeed();
@@ -403,5 +416,52 @@ describe('RealMTAService', () => {
       // Should include which feed failed
       expect(errorMessage).toMatch(/feed|URL/i);
     }
+  });
+
+  test('shouldMarkCalculatedRoutesAsNonRealTime', async () => {
+    // Mock one GTFS feed to work, so we get some routes including transfer routes
+    const validGtfsResponse = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: () => null
+      },
+      arrayBuffer: async () => {
+        // Valid GTFS FeedMessage with empty entities (no real-time trips)
+        const validData = new Uint8Array([
+          0x0A, 0x04,       // field 1 (header), length 4
+          0x0A, 0x02,       // field 1 (gtfs_realtime_version), length 2  
+          0x32, 0x2E        // "2."
+        ]);
+        return validData.buffer;
+      }
+    } as any;
+
+    // Mock responses for all the feeds in order they're called
+    mockFetch
+      .mockResolvedValueOnce(validGtfsResponse) // NQRW feed works  
+      .mockResolvedValueOnce(validGtfsResponse) // BDFM feed works
+      .mockRejectedValueOnce(new Error('Feed unavailable')) // 123456S feed fails
+      .mockRejectedValueOnce(new Error('Feed unavailable')) // ACE feed fails
+      .mockRejectedValueOnce(new Error('Feed unavailable')) // L feed fails
+      .mockRejectedValueOnce(new Error('Feed unavailable')) // Bus feed fails
+      .mockResolvedValueOnce(validGtfsResponse); // Alerts feed works
+
+    const routes = await service.calculateRoutes(
+      '42 Woodhull St, Brooklyn',
+      '512 W 22nd St, Manhattan',
+      '9:00 AM'
+    );
+    
+    // Should get some routes since at least one feed worked
+    expect(routes.length).toBeGreaterThan(0);
+    
+    // Calculated/transfer routes should be marked as NOT real-time data
+    routes.forEach(route => {
+      if (route.method.includes('→')) { // Transfer routes  
+        expect(route.isRealTimeData).toBe(false);
+      }
+    });
   });
 });
