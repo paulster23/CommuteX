@@ -32,10 +32,9 @@ export function TransferRouteIcon({ routeLine }: TransferRouteIconProps) {
       >
         <Text testID={`subway-icon-${firstLine}`} style={styles.subwayIconText}>{firstLine}</Text>
       </View>
-      <Text style={styles.transferArrow}>→</Text>
       <View 
         testID="subway-icon"
-        style={[styles.subwayIcon, { backgroundColor: colors.subway[secondLine as keyof typeof colors.subway] || '#666' }]}
+        style={[styles.subwayIcon, styles.secondIcon, { backgroundColor: colors.subway[secondLine as keyof typeof colors.subway] || '#666' }]}
       >
         <Text testID={`subway-icon-${secondLine}`} style={styles.subwayIconText}>{secondLine}</Text>
       </View>
@@ -51,18 +50,16 @@ const styles = StyleSheet.create({
   subwayIcon: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  secondIcon: {
+    marginLeft: 4,
   },
   subwayIconText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#fff',
-  },
-  transferArrow: {
-    fontSize: 16,
-    marginHorizontal: 6,
-    color: '#666',
   },
 });

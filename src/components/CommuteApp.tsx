@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Animated, useColorScheme } from 'react-native';
-import { Clock, ArrowDown, ArrowUp, Zap, Calendar } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Animated, useColorScheme } from 'react-native';
+import { Clock, ArrowDown, ArrowUp, Zap } from 'lucide-react-native';
 import { RealMTAService, Route } from '../services/RealMTAService';
 import { TransferRouteIcon } from './TransferRouteIcon';
 import { getThemeStyles } from '../design/components';
@@ -96,13 +96,14 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
       {/* Main Route Info */}
       <View style={styles.routeCard.header}>
         <View style={styles.routeCard.mainInfo}>
-          <View style={[styles.routeCard.iconContainer, { backgroundColor: subwayColor }]}>
+          <View style={[
+            styles.routeCard.iconContainer, 
+            // Only apply background color for single routes, not transfers
+            !subwayLine.includes('→') && { backgroundColor: subwayColor }
+          ]}>
             {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
           </View>
           <View style={styles.routeCard.textInfo}>
-            <Text style={styles.routeCard.title}>
-              {route.method.replace(' + Walk', '')}
-            </Text>
             <Text style={styles.routeCard.subtitle}>
               {(route.transfers ?? 0) === 0 ? 'Direct' : `${route.transfers} transfer${(route.transfers ?? 0) > 1 ? 's' : ''}`}
             </Text>
@@ -396,10 +397,23 @@ export function CommuteApp() {
     >
       {/* Header */}
       <View style={styles.header.container}>
-        <Text style={styles.header.title}>Morning Commute</Text>
-        <Text style={styles.header.subtitle}>
-          {COMMUTE_DATA.home.split(',')[0]} → {COMMUTE_DATA.work.split(',')[0]}
-        </Text>
+        <View>
+          <Text style={styles.header.title}>Morning Commute</Text>
+          <Text style={styles.header.subtitle}>
+            {COMMUTE_DATA.home.split(',')[0]} → {COMMUTE_DATA.work.split(',')[0]}
+          </Text>
+        </View>
+        
+        {/* Compact Status Widget */}
+        <View testID="compact-status-widget" style={{ alignItems: 'flex-end' }}>
+          <View style={[styles.indicator.container, styles.indicator.live, { marginBottom: 4 }]}>
+            <Zap size={12} color={styles.theme.colors.success} style={{ marginRight: 4 }} />
+            <Text style={[styles.indicator.text, styles.indicator.liveText]}>LIVE</Text>
+          </View>
+          <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary }}>
+            {lastUpdated.toLocaleTimeString()}
+          </Text>
+        </View>
       </View>
       
       <ScrollView
@@ -415,19 +429,6 @@ export function CommuteApp() {
           />
         }
       >
-        {/* Status Bar */}
-        <View style={styles.statusBar.container}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Calendar size={14} color={styles.theme.colors.textSecondary} style={{ marginRight: 6 }} />
-            <Text style={styles.statusBar.text}>
-              Last updated: {lastUpdated.toLocaleTimeString()}
-            </Text>
-          </View>
-          <View style={[styles.indicator.container, styles.indicator.live]}>
-            <Zap size={12} color={styles.theme.colors.success} style={{ marginRight: 4 }} />
-            <Text style={[styles.indicator.text, styles.indicator.liveText]}>LIVE</Text>
-          </View>
-        </View>
 
         {/* Routes */}
         {loading ? (

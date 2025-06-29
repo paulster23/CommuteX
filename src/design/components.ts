@@ -105,6 +105,9 @@ export const createIndicatorStyles = (theme: Theme) => StyleSheet.create({
 // Modern header styles
 export const createHeaderStyles = (theme: Theme) => StyleSheet.create({
   container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xxl + spacing.lg, // Account for status bar
     paddingBottom: spacing.lg,
