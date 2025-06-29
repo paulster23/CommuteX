@@ -37,6 +37,14 @@ export interface ServiceAlert {
   activeUntil?: Date;
 }
 
+interface StopTimeUpdate {
+  stopId: string;
+  stopSequence: number;
+  arrivalTime?: number;
+  departureTime?: number;
+  delay?: number;
+}
+
 export class RealMTAService {
   private readonly locationProvider: LocationProvider;
   
@@ -792,5 +800,101 @@ export class RealMTAService {
       minute: '2-digit',
       hour12: true
     });
+  }
+
+  private parseStopTimeUpdates(tripUpdate: any): StopTimeUpdate[] {
+    if (!tripUpdate.stopTimeUpdate) return [];
+    
+    return tripUpdate.stopTimeUpdate.map((stu: any) => ({
+      stopId: stu.stopId,
+      stopSequence: stu.stopSequence || 0,
+      arrivalTime: stu.arrival?.time,
+      departureTime: stu.departure?.time,
+      delay: stu.arrival?.delay || stu.departure?.delay || 0
+    }));
+  }
+
+  private static readonly STOP_ID_MAPPINGS = {
+    'Carroll St': { 'F': 'F18' },
+    'Jay St-MetroTech': { 'F': 'F20', 'A': 'A41', 'C': 'A41' },
+    '23rd St': { 'F': 'F22' },
+    '23rd St-8th Ave': { 'A': 'A24', 'C': 'A24' },
+    'Union St': { 'R': 'R25', 'N': 'R25' },
+    'Borough Hall': { '4': '420', '5': '420' },
+    '14th St-Union Sq': { '4': '635', '5': '635', '6': '635' }
+  };
+
+  private getStopId(stationName: string, routeId: string): string | null {
+    const stationMappings = RealMTAService.STOP_ID_MAPPINGS[stationName as keyof typeof RealMTAService.STOP_ID_MAPPINGS];
+    if (!stationMappings) return null;
+    return (stationMappings as any)[routeId] || null;
+  }
+
+  private findNextDepartureAfter(trips: any[], stationName: string, afterTime: Date): any | null {
+    const stopId = this.getStopId(stationName, trips[0]?.trip?.routeId);
+    if (!stopId) return null;
+    
+    for (const trip of trips) {
+      const stopTime = trip.stopTimes.find((st: StopTimeUpdate) => st.stopId === stopId);
+      if (stopTime?.departureTime) {
+        const departureTime = new Date(stopTime.departureTime * 1000);
+        if (departureTime > afterTime) {
+          return {
+            trip: trip.trip,
+            departureTime,
+            stopTimes: trip.stopTimes
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  private buildPreciseTransferRoute(
+    departureTime: Date,
+    startStation: string,
+    endStation: string, 
+    firstRoute: string,
+    secondRoute: string,
+    transferStation: string,
+    firstRouteTrips: any[],
+    secondRouteTrips: any[]
+  ): any {
+    // Calculate walk time to first train (15 minutes as specified)
+    const walkToStationTime = new Date(departureTime.getTime() + 15 * 60 * 1000);
+    
+    // Find next departure after walking to station
+    const firstTrain = this.findNextDepartureAfter(firstRouteTrips, startStation, walkToStationTime);
+    if (!firstTrain) return null;
+    
+    // Find arrival time at transfer station
+    const transferStopId = this.getStopId(transferStation, firstRoute);
+    const transferStopTime = firstTrain.stopTimes.find((st: StopTimeUpdate) => st.stopId === transferStopId);
+    if (!transferStopTime?.arrivalTime) return null;
+    
+    const transferArrival = new Date(transferStopTime.arrivalTime * 1000);
+    
+    // Add transfer time (30 seconds as specified)
+    const transferComplete = new Date(transferArrival.getTime() + 30 * 1000);
+    
+    // Find next second train after transfer
+    const secondTrain = this.findNextDepartureAfter(secondRouteTrips, transferStation, transferComplete);
+    if (!secondTrain) return null;
+    
+    // Find final arrival time
+    const finalStopId = this.getStopId(endStation, secondRoute);
+    const finalStopTime = secondTrain.stopTimes.find((st: StopTimeUpdate) => st.stopId === finalStopId);
+    if (!finalStopTime?.arrivalTime) return null;
+    
+    const finalArrival = new Date(finalStopTime.arrivalTime * 1000);
+    
+    return {
+      firstTrainDeparture: firstTrain.departureTime,
+      transferArrival,
+      secondTrainDeparture: secondTrain.departureTime,
+      finalArrival,
+      totalTravelTime: Math.round((finalArrival.getTime() - departureTime.getTime()) / (60 * 1000)),
+      transferWaitTime: Math.round((secondTrain.departureTime.getTime() - transferArrival.getTime()) / (60 * 1000))
+    };
   }
 }

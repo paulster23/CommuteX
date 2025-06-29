@@ -16,6 +16,84 @@ describe('RealMTAService', () => {
     jest.restoreAllMocks();
   });
 
+  test('shouldParseStopTimeUpdatesFromGTFSData', () => {
+    // Red: Write failing test for parsing stopTimeUpdate data
+    const mockTripUpdate = {
+      stopTimeUpdate: [
+        {
+          stopId: 'F18',
+          stopSequence: 1,
+          arrival: { time: 1487415600, delay: 0 },
+          departure: { time: 1487415630, delay: 0 }
+        },
+        {
+          stopId: 'F20',
+          stopSequence: 2,
+          arrival: { time: 1487415900, delay: 60 },
+          departure: { time: 1487415930, delay: 60 }
+        }
+      ]
+    };
+
+    const result = (service as any).parseStopTimeUpdates(mockTripUpdate);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      stopId: 'F18',
+      stopSequence: 1,
+      arrivalTime: 1487415600,
+      departureTime: 1487415630,
+      delay: 0
+    });
+    expect(result[1]).toEqual({
+      stopId: 'F20',
+      stopSequence: 2,
+      arrivalTime: 1487415900,
+      departureTime: 1487415930,
+      delay: 60
+    });
+  });
+
+  test('shouldMapStationNamesToGTFSStopIds', () => {
+    // Red: Write failing test for station name to stop ID mapping
+    const result1 = (service as any).getStopId('Carroll St', 'F');
+    const result2 = (service as any).getStopId('Jay St-MetroTech', 'F');
+    const result3 = (service as any).getStopId('Jay St-MetroTech', 'C');
+    const result4 = (service as any).getStopId('Unknown Station', 'F');
+
+    expect(result1).toBe('F18');
+    expect(result2).toBe('F20');
+    expect(result3).toBe('A41');
+    expect(result4).toBeNull();
+  });
+
+  test('shouldFindNextDepartureAfterGivenTime', () => {
+    // Red: Write failing test for finding next departure after specific time
+    const mockTrips = [
+      {
+        trip: { tripId: 'trip1', routeId: 'F' },
+        stopTimes: [
+          { stopId: 'F18', departureTime: 1487415400 }, // 11:10 AM
+          { stopId: 'F20', departureTime: 1487415700 }  // 11:15 AM
+        ]
+      },
+      {
+        trip: { tripId: 'trip2', routeId: 'F' },
+        stopTimes: [
+          { stopId: 'F18', departureTime: 1487415800 }, // 11:16:40 AM
+          { stopId: 'F20', departureTime: 1487416100 }  // 11:21:40 AM
+        ]
+      }
+    ];
+
+    const afterTime = new Date(1487415500 * 1000); // 11:11:40 AM
+    const result = (service as any).findNextDepartureAfter(mockTrips, 'Carroll St', afterTime);
+
+    expect(result).toBeDefined();
+    expect(result.trip.tripId).toBe('trip2');
+    expect(result.departureTime).toEqual(new Date(1487415800 * 1000));
+  });
+
   test('shouldInitializeWithoutAPIKey', () => {
     const service = new RealMTAService();
     expect(service).toBeDefined();
@@ -415,6 +493,51 @@ describe('RealMTAService', () => {
       expect(errorMessage).toContain('parse');
       // Should include which feed failed
       expect(errorMessage).toMatch(/feed|URL/i);
+    }
+  });
+
+  test('shouldBuildPreciseTransferRouteWithRealGTFSData', () => {
+    // Red: Write failing test for precise transfer route calculation
+    const baseTime = 1487437200; // 11:00 AM EST base timestamp
+    const mockNow = new Date(baseTime * 1000); 
+    const mockTripDataF = [
+      {
+        trip: { tripId: 'F123', routeId: 'F' },
+        stopTimes: [
+          { stopId: 'F18', departureTime: baseTime + 1000, arrivalTime: baseTime + 1000 }, // 11:16:40 AM EST
+          { stopId: 'F20', departureTime: baseTime + 1200, arrivalTime: baseTime + 1200 }  // 11:20 AM EST
+        ]
+      }
+    ];
+    const mockTripDataC = [
+      {
+        trip: { tripId: 'C456', routeId: 'C' },
+        stopTimes: [
+          { stopId: 'A41', departureTime: baseTime + 1320, arrivalTime: baseTime + 1320 }, // 11:22 AM EST  
+          { stopId: 'A24', departureTime: baseTime + 1620, arrivalTime: baseTime + 1620 }  // 11:27 AM EST
+        ]
+      }
+    ];
+
+    const result = (service as any).buildPreciseTransferRoute(
+      mockNow,
+      'Carroll St',
+      '23rd St-8th Ave', 
+      'F',
+      'C',
+      'Jay St-MetroTech',
+      mockTripDataF,
+      mockTripDataC
+    );
+
+    expect(result).not.toBeNull();
+    if (result) {
+      expect(result.firstTrainDeparture).toEqual(new Date((baseTime + 1000) * 1000)); 
+      expect(result.transferArrival).toEqual(new Date((baseTime + 1200) * 1000));      
+      expect(result.secondTrainDeparture).toEqual(new Date((baseTime + 1320) * 1000)); 
+      expect(result.finalArrival).toEqual(new Date((baseTime + 1620) * 1000));        
+      expect(result.totalTravelTime).toBe(27); // 1620 seconds = 27 minutes
+      expect(result.transferWaitTime).toBe(2); // 120 seconds = 2 minutes
     }
   });
 
