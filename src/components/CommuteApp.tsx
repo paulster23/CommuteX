@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Animated, useColorScheme } from 'react-native';
-import { Clock, ArrowDown, ArrowUp, Zap } from 'lucide-react-native';
+import { ArrowDown, ArrowUp, Zap } from 'lucide-react-native';
 import { RealMTAService, Route } from '../services/RealMTAService';
 import { TransferRouteIcon } from './TransferRouteIcon';
 import { getThemeStyles } from '../design/components';
@@ -59,30 +59,9 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
     return colors.subway[line as keyof typeof colors.subway] || styles.theme.colors.textSecondary;
   };
 
-  const getCountdownMinutes = (): number => {
-    // Calculate minutes until departure (simplified)
-    const now = new Date();
-    const [time, period] = route.arrivalTime.split(' ');
-    const [hours, minutes] = time.split(':').map(Number);
-    
-    let hour24 = hours;
-    if (period === 'PM' && hours !== 12) hour24 += 12;
-    if (period === 'AM' && hours === 12) hour24 = 0;
-    
-    const arrivalTime = new Date();
-    arrivalTime.setHours(hour24, minutes, 0, 0);
-    
-    // Subtract total journey time to get departure time
-    const totalMinutes = parseInt(route.duration.replace(' min', ''));
-    const departureTime = new Date(arrivalTime.getTime() - totalMinutes * 60000);
-    
-    const diffMs = departureTime.getTime() - now.getTime();
-    return Math.max(0, Math.floor(diffMs / 60000));
-  };
 
   const subwayLine = getSubwayLineFromMethod(route.method);
   const subwayColor = getSubwayColor(subwayLine);
-  const countdownMinutes = getCountdownMinutes();
 
   return (
     <TouchableOpacity 
@@ -96,21 +75,36 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
       {/* Main Route Info */}
       <View style={styles.routeCard.header}>
         <View style={styles.routeCard.mainInfo}>
-          <View style={[
-            styles.routeCard.iconContainer, 
-            // Only apply background color for single routes, not transfers
-            !subwayLine.includes('→') && { backgroundColor: subwayColor }
-          ]}>
+          <View 
+            testID="route-icon-container"
+            style={[
+              styles.routeCard.iconContainer, 
+              // Only apply background color for single routes, not transfers
+              !subwayLine.includes('→') && { backgroundColor: subwayColor }
+            ]}
+          >
             {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
           </View>
           <View style={styles.routeCard.textInfo}>
-            <Text style={styles.routeCard.subtitle}>
-              {(route.transfers ?? 0) === 0 ? 'Direct' : `${route.transfers} transfer${(route.transfers ?? 0) > 1 ? 's' : ''}`}
-            </Text>
+            <View style={{
+              backgroundColor: (route.transfers ?? 0) === 0 ? styles.theme.colors.success + '20' : styles.theme.colors.warning + '20',
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 16,
+              alignSelf: 'flex-start'
+            }}>
+              <Text style={{
+                fontSize: 12,
+                fontWeight: '600',
+                color: (route.transfers ?? 0) === 0 ? styles.theme.colors.success : styles.theme.colors.warning
+              }}>
+                {(route.transfers ?? 0) === 0 ? 'Direct' : `${route.transfers} transfer${(route.transfers ?? 0) > 1 ? 's' : ''}`}
+              </Text>
+            </View>
           </View>
         </View>
         
-        <View style={styles.routeCard.timeInfo}>
+        <View testID="time-info-container" style={[styles.routeCard.timeInfo, { paddingRight: 4 }]}>
           <Text style={styles.routeCard.arrivalTime}>{route.arrivalTime}</Text>
           <Text style={styles.routeCard.duration}>{route.duration}</Text>
           {route.isRealTimeData ? (
@@ -127,26 +121,6 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
         </View>
       </View>
 
-      {/* Countdown Timer */}
-      <View style={styles.routeCard.countdownContainer}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <Clock size={14} color={styles.theme.colors.primary} style={{ marginRight: 6 }} />
-          <Text style={styles.routeCard.countdownText}>
-            {countdownMinutes > 0 ? `Departs in ${countdownMinutes}m` : 'Departing now'}
-          </Text>
-        </View>
-        <View style={styles.routeCard.countdownBar}>
-          <View 
-            style={[
-              styles.routeCard.countdownProgress, 
-              { 
-                backgroundColor: subwayColor,
-                width: `${Math.max(10, Math.min(100, (30 - countdownMinutes) / 30 * 100))}%`
-              }
-            ]} 
-          />
-        </View>
-      </View>
 
       {/* Expandable Details */}
       <Animated.View
@@ -161,7 +135,15 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
           },
         ]}
       >
-        <View style={{ paddingVertical: 16, borderTopWidth: 1, borderTopColor: styles.theme.colors.borderLight }}>
+        <View 
+          testID="step-by-step-container"
+          style={{ 
+            paddingVertical: 16, 
+            paddingHorizontal: 24, // Add consistent horizontal padding
+            borderTopWidth: 1, 
+            borderTopColor: styles.theme.colors.borderLight 
+          }}
+        >
           <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 12, color: styles.theme.colors.text }}>Step-by-step directions:</Text>
           
           {/* Walking Step */}
@@ -170,10 +152,10 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
               <Text style={{ fontSize: 12, fontWeight: '600' }}>🚶</Text>
             </View>
             <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
-                Walk {route.walkingToTransit} min to {subwayLine} train at <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
+              <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+                <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
               </Text>
-              <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>{route.walkingToTransit} min</Text>
+              <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>{route.walkingToTransit} min</Text>
             </View>
           </View>
 
@@ -184,10 +166,10 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                 <Text style={{ fontSize: 12, fontWeight: '600' }}>⏱️</Text>
               </View>
               <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
-                  Wait for next {subwayLine} train at <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
+                <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+                  Wait at <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
                 </Text>
-                <Text style={{ fontSize: 12, color: '#FF6B35', fontWeight: '600' }}>
+                <Text style={{ fontSize: 12, color: '#FF6B35', fontWeight: '600', marginRight: 8 }}>
                   {route.waitTime} min wait
                 </Text>
               </View>
@@ -202,10 +184,10 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                 <Text style={{ fontSize: 12, fontWeight: '600', color: '#fff' }}>{subwayLine}</Text>
               </View>
               <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
-                  Take {subwayLine} train from <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text> to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
+                <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+                  <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
                 </Text>
-                <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>
+                <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>
                   {parseInt(route.duration.replace(' min', '')) - (route.walkingToTransit || 0) - (route.waitTime || 0) - (route.finalWalkingTime || 0)} min
                 </Text>
               </View>
@@ -222,14 +204,14 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                   <>
                     {/* First train segment */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.subway[firstLine] || styles.theme.colors.textSecondary, marginRight: 12 }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.subway[firstLine as keyof typeof colors.subway] || styles.theme.colors.textSecondary, marginRight: 12 }}>
                         <Text style={{ fontSize: 12, fontWeight: '600', color: '#fff' }}>{firstLine}</Text>
                       </View>
                       <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
-                          Take {firstLine} train from <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text> to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text>
+                        <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+                          <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text>
                         </Text>
-                        <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>~12 min</Text>
+                        <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>~12 min</Text>
                       </View>
                     </View>
                     
@@ -239,25 +221,25 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                         <Text style={{ fontSize: 12, fontWeight: '600' }}>🔄</Text>
                       </View>
                       <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
-                          Transfer at <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text>
+                        <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+                          <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text>
                         </Text>
-                        <Text style={{ fontSize: 12, color: styles.theme.colors.primary, fontWeight: '600' }}>
-                          30 sec walk
+                        <Text style={{ fontSize: 12, color: styles.theme.colors.primary, fontWeight: '600', marginRight: 8 }}>
+                          30 sec
                         </Text>
                       </View>
                     </View>
                     
                     {/* Second train segment */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.subway[secondLine] || styles.theme.colors.textSecondary, marginRight: 12 }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.subway[secondLine as keyof typeof colors.subway] || styles.theme.colors.textSecondary, marginRight: 12 }}>
                         <Text style={{ fontSize: 12, fontWeight: '600', color: '#fff' }}>{secondLine}</Text>
                       </View>
                       <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
-                          Take {secondLine} train from <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text> to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
+                        <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+                          <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
                         </Text>
-                        <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>~10 min</Text>
+                        <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>~10 min</Text>
                       </View>
                     </View>
                   </>
@@ -270,7 +252,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
           {route.nextTrainDeparture && (
             <View style={{ backgroundColor: styles.theme.colors.surfaceSecondary, padding: 12, borderRadius: 8, marginTop: 8, marginBottom: 8 }}>
               <Text style={{ fontSize: 13, color: styles.theme.colors.textSecondary, textAlign: 'center' }}>
-                Next {subwayLine} train departs: <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.nextTrainDeparture}</Text>
+                Next train: <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.nextTrainDeparture}</Text>
               </Text>
             </View>
           )}
@@ -282,10 +264,10 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                 <Text style={{ fontSize: 12, fontWeight: '600' }}>🚶</Text>
               </View>
               <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text }}>
-                  Walk to destination from <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
+                <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+                  Destination
                 </Text>
-                <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>
+                <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>
                   {route.finalWalkingTime ? `${route.finalWalkingTime} min` : route.walkingDistance}
                 </Text>
               </View>
@@ -294,7 +276,14 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
         </View>
 
         {/* Confidence & Additional Info */}
-        <View style={{ paddingTop: 12, borderTopWidth: 1, borderTopColor: styles.theme.colors.borderLight }}>
+        <View 
+          testID="confidence-section"
+          style={{ 
+            paddingTop: 12, 
+            paddingBottom: 16,
+            paddingHorizontal: 24 // Add consistent horizontal padding to match step-by-step directions
+          }}
+        >
           {route.confidence && (
             <Text style={{ fontSize: 12, color: styles.theme.colors.textTertiary, fontStyle: 'italic' }}>
               Confidence: {route.confidence}
@@ -364,6 +353,12 @@ export function CommuteApp() {
       });
       
       setRoutes(routeData);
+      
+      // Expand the first route (earliest arrival time) by default
+      if (routeData.length > 0) {
+        setExpandedRoutes(new Set([routeData[0].id]));
+      }
+      
       setLastUpdated(new Date());
     } catch (error) {
       console.error('[DEBUG UI] Failed to load routes:', error);
