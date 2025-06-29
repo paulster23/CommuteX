@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Animated, use
 import { ArrowDown, ArrowUp, Zap } from 'lucide-react-native';
 import { RealMTAService, Route } from '../services/RealMTAService';
 import { TransferRouteIcon } from './TransferRouteIcon';
+import { TrainDeparturePills } from './TrainDeparturePills';
 import { getThemeStyles } from '../design/components';
 import { colors } from '../design/theme';
 
@@ -412,6 +413,14 @@ export function CommuteApp() {
           </Text>
         </View>
       </View>
+
+      {/* Train Departure Pills */}
+      {routes.length > 0 && routes[0].nextDepartures && (
+        <TrainDeparturePills 
+          departures={routes[0].nextDepartures} 
+          stationName={routes[0].startingStation || 'Station'} 
+        />
+      )}
       
       <ScrollView
         testID="scroll-view"

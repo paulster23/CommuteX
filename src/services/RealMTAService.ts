@@ -21,6 +21,8 @@ export interface Route {
   transferStation?: string;
   transferWalkingTime?: number;
   secondWaitTime?: number;
+  // Next train departures for the first station
+  nextDepartures?: NextTrainDeparture[];
 }
 
 export interface GTFSData {
@@ -43,6 +45,12 @@ interface StopTimeUpdate {
   arrivalTime?: number;
   departureTime?: number;
   delay?: number;
+}
+
+export interface NextTrainDeparture {
+  trainLine: string;
+  departureTime: string;
+  minutesAway: number;
 }
 
 export class RealMTAService {
@@ -717,6 +725,9 @@ export class RealMTAService {
         total: totalTime
       });
       
+      // Get next 3 departures for the first station
+      const nextDepartures = this.getMockNextDepartures(firstLine, walkingTime);
+
       return {
         id: routeId,
         arrivalTime: arrivalTimeStr,
@@ -736,7 +747,8 @@ export class RealMTAService {
         // Additional transfer-specific data
         transferStation: mapping.transferStation,
         transferWalkingTime: mapping.transferWalkingTime,
-        secondWaitTime: secondWaitTime
+        secondWaitTime: secondWaitTime,
+        nextDepartures: nextDepartures.length > 0 ? nextDepartures : undefined
       };
     } catch (error) {
       console.warn(`Failed to build transfer route ${routeKey}:`, error);
@@ -896,5 +908,74 @@ export class RealMTAService {
       totalTravelTime: Math.round((finalArrival.getTime() - departureTime.getTime()) / (60 * 1000)),
       transferWaitTime: Math.round((secondTrain.departureTime.getTime() - transferArrival.getTime()) / (60 * 1000))
     };
+  }
+
+  private getNext3Departures(stationName: string, routeId: string, tripData: any[], currentTime: Date): NextTrainDeparture[] {
+    const stopId = this.getStopId(stationName, routeId);
+    if (!stopId) return [];
+
+    const departures = [];
+    
+    for (const trip of tripData) {
+      const stopTime = trip.stopTimes.find((st: StopTimeUpdate) => st.stopId === stopId);
+      if (stopTime?.departureTime) {
+        const departureTime = new Date(stopTime.departureTime * 1000);
+        if (departureTime > currentTime) {
+          departures.push({
+            departureTime,
+            tripId: trip.trip.tripId
+          });
+        }
+      }
+    }
+
+    // Sort by departure time and take first 3
+    departures.sort((a, b) => a.departureTime.getTime() - b.departureTime.getTime());
+    const next3 = departures.slice(0, 3);
+
+    return next3.map(dep => {
+      const minutesAway = Math.round((dep.departureTime.getTime() - currentTime.getTime()) / (60 * 1000));
+      const formattedTime = dep.departureTime.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+      return {
+        trainLine: routeId,
+        departureTime: formattedTime,
+        minutesAway
+      };
+    });
+  }
+
+  private getMockNextDepartures(trainLine: string, walkingTime: number): NextTrainDeparture[] {
+    const currentTime = new Date();
+    const arrivalTime = new Date(currentTime.getTime() + walkingTime * 60 * 1000);
+    
+    const departures = [];
+    
+    // Generate 3 mock departures with realistic frequency
+    const trainFrequencies: { [key: string]: number } = {
+      'F': 6, 'R': 8, '4': 5, 'N': 8, 'Q': 7, 'W': 10, 'A': 6, 'C': 8, 'L': 5
+    };
+    
+    const frequency = trainFrequencies[trainLine] || 8;
+    
+    for (let i = 0; i < 3; i++) {
+      const departureTime = new Date(arrivalTime.getTime() + (i * frequency * 60 * 1000));
+      const minutesAway = Math.round((departureTime.getTime() - currentTime.getTime()) / (60 * 1000));
+      
+      departures.push({
+        trainLine,
+        departureTime: departureTime.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }),
+        minutesAway
+      });
+    }
+    
+    return departures;
   }
 }

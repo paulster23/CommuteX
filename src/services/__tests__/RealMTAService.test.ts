@@ -541,6 +541,47 @@ describe('RealMTAService', () => {
     }
   });
 
+  test('shouldGetNext3TrainDeparturesFromStation', () => {
+    // Red: Write failing test for getting next 3 train departures
+    const baseTime = 1487437200; // 11:00 AM EST base timestamp
+    const mockNow = new Date(baseTime * 1000);
+    const mockTripData = [
+      {
+        trip: { tripId: 'F123', routeId: 'F' },
+        stopTimes: [
+          { stopId: 'F18', departureTime: baseTime + 1000, arrivalTime: baseTime + 1000 }, // 11:16:40 AM
+        ]
+      },
+      {
+        trip: { tripId: 'F124', routeId: 'F' },
+        stopTimes: [
+          { stopId: 'F18', departureTime: baseTime + 1300, arrivalTime: baseTime + 1300 }, // 11:21:40 AM
+        ]
+      },
+      {
+        trip: { tripId: 'F125', routeId: 'F' },
+        stopTimes: [
+          { stopId: 'F18', departureTime: baseTime + 1600, arrivalTime: baseTime + 1600 }, // 11:26:40 AM
+        ]
+      }
+    ];
+
+    const result = (service as any).getNext3Departures('Carroll St', 'F', mockTripData, mockNow);
+
+    expect(result).toHaveLength(3);
+    expect(result[0].trainLine).toBe('F');
+    expect(result[0].minutesAway).toBe(17);
+    expect(result[0].departureTime).toContain('12:16'); // Timezone converted
+    
+    expect(result[1].trainLine).toBe('F');
+    expect(result[1].minutesAway).toBe(22);
+    expect(result[1].departureTime).toContain('12:21');
+    
+    expect(result[2].trainLine).toBe('F');
+    expect(result[2].minutesAway).toBe(27);
+    expect(result[2].departureTime).toContain('12:26');
+  });
+
   test('shouldMarkCalculatedRoutesAsNonRealTime', async () => {
     // Mock one GTFS feed to work, so we get some routes including transfer routes
     const validGtfsResponse = {
