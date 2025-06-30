@@ -204,14 +204,14 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                     
                     {/* Transfer step */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF3CD', marginRight: 12 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '600' }}>⏱️</Text>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#E8F4FD', marginRight: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600' }}>🔄</Text>
                       </View>
                       <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
                           Wait for the <Text style={{ fontWeight: '600', color: colors.subway[secondLine as keyof typeof colors.subway] || styles.theme.colors.primary }}>{secondLine}</Text> train
                         </Text>
-                        <Text style={{ fontSize: 12, color: '#FF6B35', fontWeight: '600', marginRight: 8 }}>
+                        <Text style={{ fontSize: 12, color: styles.theme.colors.primary, fontWeight: '600', marginRight: 8 }}>
                           {route.transferWaitTime || 2} min wait
                         </Text>
                       </View>
