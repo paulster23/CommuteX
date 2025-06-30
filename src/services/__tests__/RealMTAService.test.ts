@@ -854,4 +854,122 @@ describe('RealMTAService', () => {
     expect(integratedData.dataQuality.staticCoverage).toBeGreaterThan(0);
     expect(integratedData.dataQuality.realTimeCoverage).toBeGreaterThanOrEqual(0); // May be 0 if no real-time feeds available
   });
+
+  // NEW TEST: NetworkX-based subway graph construction
+  test('shouldBuildNetworkXGraphFromIntegratedData', async () => {
+    // Red: Write failing test that expects NetworkX-style graph construction
+    // Following NYC Subway Challenge approach: "plans to use NetworkX for graph problem solving"
+    
+    const staticData = await (service as any).loadGTFSStaticData();
+    const integratedData = await (service as any).integrateRealTimeWithStatic(staticData);
+    const networkGraph = await (service as any).buildNetworkXGraph(integratedData);
+    
+    // Verify we get a NetworkX-style graph structure
+    expect(networkGraph).toBeDefined();
+    expect(networkGraph.nodes).toBeInstanceOf(Map);
+    expect(networkGraph.edges).toBeInstanceOf(Map);
+    expect(networkGraph.adjacencyList).toBeInstanceOf(Map);
+    
+    // Verify graph has proper NYC subway structure
+    expect(networkGraph.nodes.size).toBeGreaterThan(100); // Real NYC has 472+ stations
+    expect(networkGraph.edges.size).toBeGreaterThan(0);
+    
+    // Verify time-dependent graph structure (key requirement from NYC Subway Challenge)
+    const sampleNode = Array.from(networkGraph.nodes.values())[0];
+    expect(sampleNode.stopId).toBeDefined();
+    expect(sampleNode.stationName).toBeDefined();
+    expect(sampleNode.coordinates).toBeDefined();
+    expect(sampleNode.coordinates.lat).toBeDefined();
+    expect(sampleNode.coordinates.lon).toBeDefined();
+    
+    // Verify edges contain time-dependent information
+    const sampleEdge = Array.from(networkGraph.edges.values())[0];
+    expect(sampleEdge.fromNode).toBeDefined();
+    expect(sampleEdge.toNode).toBeDefined();
+    expect(sampleEdge.route).toBeDefined();
+    expect(sampleEdge.travelTime).toBeGreaterThan(0);
+    expect(sampleEdge.timeOfDay).toBeDefined(); // Time-dependent weights
+    
+    // Verify graph includes transfer connections
+    const transferEdges = Array.from(networkGraph.edges.values()).filter((edge: any) => edge.edgeType === 'transfer');
+    expect(transferEdges.length).toBeGreaterThan(0);
+    
+    // Verify graph supports pathfinding operations (NetworkX compatibility)
+    expect(networkGraph.getNeighbors).toBeDefined();
+    expect(networkGraph.getShortestPath).toBeDefined();
+    expect(networkGraph.calculateDistance).toBeDefined();
+    
+    // Test basic graph operations
+    const nodeIds = Array.from(networkGraph.nodes.keys());
+    const firstNodeId = nodeIds[0];
+    const neighbors = networkGraph.getNeighbors(firstNodeId);
+    expect(neighbors).toBeInstanceOf(Array);
+    
+    // Verify time-dependent pathfinding capability
+    expect(networkGraph.metadata).toBeDefined();
+    expect(networkGraph.metadata.isTimeDependentGraph).toBe(true);
+    expect(networkGraph.metadata.lastUpdated).toBeInstanceOf(Date);
+  });
+
+  test('shouldImplementTimeDependentPathfindingAlgorithm', async () => {
+    // Red: Write failing test for time-dependent pathfinding following NYC Subway Challenge approach
+    // Following NYC Subway Challenge requirement: "time-dependent graph construction and pathfinding"
+    
+    const staticData = await (service as any).loadGTFSStaticData();
+    const integratedData = await (service as any).integrateRealTimeWithStatic(staticData);
+    const networkGraph = await (service as any).buildNetworkXGraph(integratedData);
+    
+    // Test time-dependent pathfinding with different departure times
+    const startNode = 'F18N'; // Carroll St F train northbound  
+    const endNode = 'A24N';   // 23rd St-8th Ave C train northbound
+    
+    // Test pathfinding at different times of day to verify time-dependent behavior
+    const morningDepartureTime = new Date('2024-01-15T08:30:00'); // Rush hour
+    const afternoonDepartureTime = new Date('2024-01-15T14:30:00'); // Off-peak
+    const eveningDepartureTime = new Date('2024-01-15T18:30:00'); // Evening rush
+    
+    // Execute time-dependent pathfinding
+    const morningPath = await (service as any).findTimeDependentPath(networkGraph, startNode, endNode, morningDepartureTime);
+    const afternoonPath = await (service as any).findTimeDependentPath(networkGraph, startNode, endNode, afternoonDepartureTime);
+    const eveningPath = await (service as any).findTimeDependentPath(networkGraph, startNode, endNode, eveningDepartureTime);
+    
+    // Verify all paths are returned
+    expect(morningPath).toBeDefined();
+    expect(afternoonPath).toBeDefined();
+    expect(eveningPath).toBeDefined();
+    
+    // Verify path structure contains time-dependent information
+    expect(morningPath.path).toBeInstanceOf(Array);
+    expect(morningPath.path.length).toBeGreaterThan(0);
+    expect(morningPath.totalTravelTime).toBeGreaterThan(0);
+    expect(morningPath.departureTime).toBeInstanceOf(Date);
+    expect(morningPath.arrivalTime).toBeInstanceOf(Date);
+    expect(morningPath.transfers).toBeDefined();
+    
+    // Verify time-dependent behavior: different times may yield different routes/travel times
+    // This is key requirement from NYC Subway Challenge: time affects optimal routes
+    expect(morningPath.totalTravelTime).toBeGreaterThan(0);
+    expect(afternoonPath.totalTravelTime).toBeGreaterThan(0);
+    expect(eveningPath.totalTravelTime).toBeGreaterThan(0);
+    
+    // Verify route includes transfer from F to C train (multi-leg journey)
+    const allStops = morningPath.path.flatMap((segment: any) => segment.stops || []);
+    expect(allStops).toContain(startNode); // Starts at Carroll St F train
+    expect(allStops).toContain(endNode);   // Ends at 23rd St C train
+    
+    // Verify transfer handling (F → C requires transfer at Jay St-MetroTech)
+    expect(morningPath.transfers.length).toBeGreaterThan(0);
+    const transferStation = morningPath.transfers.find((t: any) => 
+      t.fromRoute === 'F' && t.toRoute === 'C'
+    );
+    expect(transferStation).toBeDefined();
+    expect(transferStation.transferStation).toMatch(/Jay St-MetroTech/i);
+    expect(transferStation.transferTime).toBeGreaterThan(0);
+    
+    // Verify real-time data integration affects pathfinding results
+    expect(morningPath.metadata).toBeDefined();
+    expect(morningPath.metadata.hasRealTimeData).toBeDefined();
+    expect(morningPath.metadata.dataSource).toContain('integrated');
+    expect(morningPath.metadata.algorithmType).toBe('time_dependent_dijkstra');
+  });
 });
