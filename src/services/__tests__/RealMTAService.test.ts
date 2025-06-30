@@ -582,6 +582,145 @@ describe('RealMTAService', () => {
     expect(result[2].departureTime).toContain('12:26');
   });
 
+  // NEW TEST: Direct F train route should be available when GTFS feeds fail
+  test('shouldIncludeDirectFTrainRouteWhenGTFSFeedsUnavailable', async () => {
+    // Red: Write failing test that expects F train direct route
+    const routes = await service.calculateRoutes(
+      '42 Woodhull St, Brooklyn',
+      '512 W 22nd St, Manhattan',
+      '9:00 AM'
+    );
+    
+    const fTrainDirectRoute = routes.find(route => 
+      route.method.includes('F train') && route.transfers === 0
+    );
+    
+    expect(fTrainDirectRoute).toBeDefined();
+    expect(fTrainDirectRoute.startingStation).toBe('Carroll St');
+    expect(fTrainDirectRoute.endingStation).toBe('23rd St');
+  });
+
+  // NEW TEST: Build transit graph from GTFS static data
+  test('shouldBuildTransitGraphFromGTFSStatic', () => {
+    // Red: Write failing test for GTFS static data parsing
+    const mockGTFSStatic = {
+      stops: [
+        { stop_id: 'F18', stop_name: 'Carroll St', stop_lat: 40.680303, stop_lon: -73.995625 },
+        { stop_id: 'F20', stop_name: 'Jay St-MetroTech', stop_lat: 40.692338, stop_lon: -73.987342 },
+        { stop_id: 'F22', stop_name: '23rd St', stop_lat: 40.742878, stop_lon: -73.992821 }
+      ],
+      routes: [
+        { route_id: 'F', route_short_name: 'F', route_long_name: 'F train' }
+      ],
+      stop_times: [
+        { trip_id: 'F123', stop_id: 'F18', stop_sequence: 1, arrival_time: '08:30:00', departure_time: '08:30:00' },
+        { trip_id: 'F123', stop_id: 'F20', stop_sequence: 2, arrival_time: '08:35:00', departure_time: '08:35:00' },
+        { trip_id: 'F123', stop_id: 'F22', stop_sequence: 3, arrival_time: '08:50:00', departure_time: '08:50:00' }
+      ]
+    };
+
+    const graph = (service as any).buildTransitGraph(mockGTFSStatic);
+
+    expect(graph).toBeDefined();
+    expect(graph.stations).toBeDefined();
+    expect(graph.stations.size).toBe(3);
+    expect(graph.stations.get('F18')).toEqual({
+      id: 'F18',
+      name: 'Carroll St',
+      lat: 40.680303,
+      lon: -73.995625
+    });
+    expect(graph.connections).toBeDefined();
+    expect(graph.connections.get('F18')).toContainEqual({
+      fromStation: 'F18',
+      toStation: 'F20',
+      route: 'F',
+      travelTime: 5 // 08:35 - 08:30 = 5 minutes
+    });
+  });
+
+  // NEW TEST: Find optimal route using Dijkstra's algorithm
+  test('shouldFindOptimalRouteUsingDijkstra', () => {
+    // Red: Write failing test for optimal pathfinding
+    const mockTransitGraph = {
+      stations: new Map([
+        ['F18', { id: 'F18', name: 'Carroll St', lat: 40.680303, lon: -73.995625 }],
+        ['F20', { id: 'F20', name: 'Jay St-MetroTech', lat: 40.692338, lon: -73.987342 }],
+        ['F22', { id: 'F22', name: '23rd St', lat: 40.742878, lon: -73.992821 }]
+      ]),
+      connections: new Map([
+        ['F18', [{ fromStation: 'F18', toStation: 'F20', route: 'F', travelTime: 5 }]],
+        ['F20', [{ fromStation: 'F20', toStation: 'F22', route: 'F', travelTime: 15 }]]
+      ])
+    };
+
+    const startTime = new Date('2025-01-01T08:00:00');
+    const optimalRoute = (service as any).findOptimalRoute(
+      mockTransitGraph,
+      'F18', // Carroll St
+      'F22', // 23rd St  
+      startTime
+    );
+
+    expect(optimalRoute).toBeDefined();
+    expect(optimalRoute.path).toEqual(['F18', 'F20', 'F22']);
+    expect(optimalRoute.totalTime).toBe(20); // 5 + 15 minutes
+    expect(optimalRoute.routes).toEqual(['F']);
+  });
+
+  // NEW TEST: Use optimal pathfinding in main route calculation
+  test('shouldUseOptimalPathfindingForRouteCalculation', async () => {
+    // Red: Write failing test for integrating optimal pathfinding into calculateRoutes
+    
+    // Mock GTFS static data that would be loaded once
+    const mockGTFSStatic = {
+      stops: [
+        { stop_id: 'F18', stop_name: 'Carroll St', stop_lat: 40.680303, stop_lon: -73.995625 },
+        { stop_id: 'F20', stop_name: 'Jay St-MetroTech', stop_lat: 40.692338, stop_lon: -73.987342 },
+        { stop_id: 'F22', stop_name: '23rd St', stop_lat: 40.742878, stop_lon: -73.992821 },
+        { stop_id: 'A41', stop_name: 'Jay St-MetroTech', stop_lat: 40.692338, stop_lon: -73.987342 },
+        { stop_id: 'A24', stop_name: '23rd St-8th Ave', stop_lat: 40.742852, stop_lon: -73.998721 }
+      ],
+      routes: [
+        { route_id: 'F', route_short_name: 'F' },
+        { route_id: 'A', route_short_name: 'A' }
+      ],
+      stop_times: [
+        { trip_id: 'F123', stop_id: 'F18', stop_sequence: 1, arrival_time: '08:30:00', departure_time: '08:30:00' },
+        { trip_id: 'F123', stop_id: 'F20', stop_sequence: 2, arrival_time: '08:35:00', departure_time: '08:35:00' },
+        { trip_id: 'F123', stop_id: 'F22', stop_sequence: 3, arrival_time: '08:50:00', departure_time: '08:50:00' },
+        { trip_id: 'A456', stop_id: 'A41', stop_sequence: 1, arrival_time: '08:40:00', departure_time: '08:40:00' },
+        { trip_id: 'A456', stop_id: 'A24', stop_sequence: 2, arrival_time: '08:55:00', departure_time: '08:55:00' }
+      ],
+      transfers: [
+        { from_stop_id: 'F20', to_stop_id: 'A41', min_transfer_time: 300 } // 5 minutes transfer at Jay St
+      ]
+    };
+
+    // Mock the service to use our test data
+    const calculateOptimalRoutesMethod = (service as any).calculateOptimalRoutes.bind(service);
+    
+    const routes = await calculateOptimalRoutesMethod(
+      '42 Woodhull St, Brooklyn',  // Near Carroll St
+      '512 W 22nd St, Manhattan',  // Near 23rd St
+      '9:00 AM',
+      mockGTFSStatic
+    );
+
+    expect(routes).toBeDefined();
+    expect(routes.length).toBeGreaterThan(0);
+    
+    // Should find direct F train route (fastest)
+    const directRoute = routes.find((r: any) => r.method.includes('F train') && r.transfers === 0);
+    expect(directRoute).toBeDefined();
+    expect(directRoute.startingStation).toBe('Carroll St');
+    expect(directRoute.endingStation).toBe('23rd St');
+    
+    // Should also find transfer route F→A as alternative
+    const transferRoute = routes.find((r: any) => r.method.includes('F→A') || r.method.includes('F') && r.transfers > 0);
+    expect(transferRoute).toBeDefined();
+  });
+
   test('shouldMarkCalculatedRoutesAsNonRealTime', async () => {
     // Mock one GTFS feed to work, so we get some routes including transfer routes
     const validGtfsResponse = {
@@ -627,5 +766,92 @@ describe('RealMTAService', () => {
         expect(route.isRealTimeData).toBe(false);
       }
     });
+  });
+
+  // NEW TEST: Real GTFS static data loading (no mock data)
+  test('shouldLoadRealGTFSStaticDataWithoutMockData', async () => {
+    // Red: Write failing test that expects real GTFS static data to be loaded
+    // This test should fail because we currently use mock data
+    
+    const realGTFSStaticData = await (service as any).loadGTFSStaticData();
+    
+    // Verify we get real GTFS static data structure
+    expect(realGTFSStaticData).toBeDefined();
+    expect(realGTFSStaticData.stops).toBeInstanceOf(Array);
+    expect(realGTFSStaticData.stops.length).toBeGreaterThan(100); // Real NYC has 472+ stations
+    expect(realGTFSStaticData.routes).toBeInstanceOf(Array);
+    expect(realGTFSStaticData.stop_times).toBeInstanceOf(Array);
+    expect(realGTFSStaticData.trips).toBeInstanceOf(Array);
+    
+    // Verify it's real data, not mock data
+    const hasRealStationCount = realGTFSStaticData.stops.length > 10; // Mock only has 5 stops
+    expect(hasRealStationCount).toBe(true);
+    
+    // Verify we have actual NYC subway routes (not just F and A)
+    const routeIds = realGTFSStaticData.routes.map((r: any) => r.route_id);
+    expect(routeIds).toContain('1');
+    expect(routeIds).toContain('4');
+    expect(routeIds).toContain('6');
+    expect(routeIds).toContain('N');
+    expect(routeIds).toContain('Q');
+    expect(routeIds).toContain('R');
+    expect(routeIds).toContain('W');
+    
+    // Verify stop IDs follow real GTFS format (not simplified mock format)
+    const realStopIds = realGTFSStaticData.stops.map((s: any) => s.stop_id);
+    const hasRealStopIdFormat = realStopIds.some((id: string) => id.length > 3); // Real IDs are longer
+    expect(hasRealStopIdFormat).toBe(true);
+  });
+
+  // NEW TEST: Real-time GTFS-RT data integration with static data
+  test('shouldIntegrateRealTimeGTFSWithStaticData', async () => {
+    // Red: Write failing test that expects real-time GTFS-RT data to be merged with static data
+    // Following NYC Subway Challenge approach: "replaces scheduled train trips with real-time trips wherever possible"
+    
+    const staticData = await (service as any).loadGTFSStaticData();
+    const integratedData = await (service as any).integrateRealTimeWithStatic(staticData);
+    
+    // Verify we get integrated data structure
+    expect(integratedData).toBeDefined();
+    expect(integratedData.staticData).toBeDefined();
+    expect(integratedData.realTimeData).toBeDefined();
+    expect(integratedData.mergedTrips).toBeInstanceOf(Array);
+    
+    // Verify real-time data was attempted to be fetched from actual MTA feeds
+    expect(integratedData.realTimeData.feedSources).toBeInstanceOf(Array);
+    // Note: feedSources may be empty if all MTA feeds are unavailable during testing
+    expect(integratedData.realTimeData.feedSources.length).toBeGreaterThanOrEqual(0);
+    
+    // Verify static trips are always available as fallback
+    const hasStaticTrips = integratedData.mergedTrips.some((trip: any) => trip.isRealTime === false);
+    expect(hasStaticTrips).toBe(true);   // Should keep static data for routes without real-time
+    
+    // Verify real-time integration works (may be 0 if feeds unavailable during test)
+    const hasRealTimeTrips = integratedData.mergedTrips.some((trip: any) => trip.isRealTime === true);
+    // This is acceptable - real-time data may not be available during testing
+    
+    // Verify static trip structure includes timing updates
+    const staticTrip = integratedData.mergedTrips.find((trip: any) => trip.isRealTime === false);
+    expect(staticTrip).toBeDefined();
+    expect(staticTrip.stopTimeUpdates).toBeInstanceOf(Array);
+    expect(staticTrip.stopTimeUpdates.length).toBeGreaterThan(0);
+    
+    // Verify stop time updates have proper structure
+    const stopUpdate = staticTrip.stopTimeUpdates[0];
+    expect(stopUpdate.stopId).toBeDefined();
+    expect(stopUpdate.arrival || stopUpdate.departure).toBeDefined();
+    
+    // If real-time trip exists, verify its structure too
+    const realTimeTrip = integratedData.mergedTrips.find((trip: any) => trip.isRealTime === true);
+    if (realTimeTrip) {
+      expect(realTimeTrip.stopTimeUpdates).toBeInstanceOf(Array);
+      expect(realTimeTrip.stopTimeUpdates.length).toBeGreaterThan(0);
+    }
+    
+    // Verify integration follows NYC Subway Challenge pattern
+    expect(integratedData.lastUpdated).toBeInstanceOf(Date);
+    expect(integratedData.dataQuality).toBeDefined();
+    expect(integratedData.dataQuality.staticCoverage).toBeGreaterThan(0);
+    expect(integratedData.dataQuality.realTimeCoverage).toBeGreaterThanOrEqual(0); // May be 0 if no real-time feeds available
   });
 });

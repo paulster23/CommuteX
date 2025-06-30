@@ -11,6 +11,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~5.0.4",
     "@expo/vector-icons": "^14.1.0",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "expo": "~53.0.13",
@@ -19,14 +20,14 @@
     "expo-status-bar": "~2.2.3",
     "gtfs-realtime-bindings": "^1.1.1",
     "lucide-react-native": "^0.525.0",
+    "node-fetch": "^3.3.2",
     "protobufjs": "^7.5.3",
     "react": "19.0.0",
     "react-dom": "^19.0.0",
     "react-native": "0.79.4",
     "react-native-gesture-handler": "^2.26.0",
     "react-native-reanimated": "^3.18.0",
-    "react-native-web": "^0.20.0",
-    "@expo/metro-runtime": "~5.0.4"
+    "react-native-web": "^0.20.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

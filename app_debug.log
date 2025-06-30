@@ -1,0 +1,18 @@
+Starting project at /Users/paul/Documents/GitHub/CommuteX/CommuteX
+Starting Metro Bundler
+The following packages should be updated for best compatibility with the installed expo version:
+  @react-native-async-storage/async-storage@2.2.0 - expected version: 2.1.2
+  react-native-gesture-handler@2.26.0 - expected version: ~2.24.0
+  react-native-reanimated@3.18.0 - expected version: ~3.17.4
+  babel-preset-expo@13.2.1 - expected version: ~13.0.0
+  jest@30.0.3 - expected version: ~29.7.0
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8082
+Logs for your project will appear below.
+Recrawled this watch 3 times, most recently because:
+MustScanSubDirs UserDroppedTo resolve, please review the information on
+https://facebook.github.io/watchman/docs/troubleshooting.html#recrawl
+To clear this warning, run:
+`watchman watch-del '/Users/paul/Documents/GitHub/CommuteX/CommuteX' ; watchman watch-project '/Users/paul/Documents/GitHub/CommuteX/CommuteX'`
+
+Web Bundled 593ms index.ts (1904 modules)
