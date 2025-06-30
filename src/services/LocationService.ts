@@ -29,7 +29,7 @@ export class StaticLocationProvider implements LocationProvider {
       id: "f-4av-9st",
       name: "4 Av-9 St (F/G)",
       lines: ["F", "G"],
-      walkingTimeMinutes: 15,
+      walkingTimeMinutes: 12,
       walkingDistanceMiles: 0.7,
       coordinates: { lat: 40.670272, lng: -73.988593 }
     },
