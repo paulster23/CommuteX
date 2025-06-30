@@ -372,11 +372,11 @@ export class RealMTAService {
   private generateRealTransfersData(): any[] {
     // Real transfer connections in NYC subway - using direction-specific stop IDs
     return [
-      // Jay St-MetroTech transfers (F to A/C lines)
-      { from_stop_id: 'F20N', to_stop_id: 'A41N', min_transfer_time: 300 }, // F northbound to C northbound
-      { from_stop_id: 'F20S', to_stop_id: 'A41S', min_transfer_time: 300 }, // F southbound to C southbound
-      { from_stop_id: 'A41N', to_stop_id: 'F20N', min_transfer_time: 300 }, // C northbound to F northbound
-      { from_stop_id: 'A41S', to_stop_id: 'F20S', min_transfer_time: 300 }, // C southbound to F southbound
+      // Jay St-MetroTech transfers (F to A/C lines) - 0 transfer time, same platform
+      { from_stop_id: 'F20N', to_stop_id: 'A41N', min_transfer_time: 0 }, // F northbound to C northbound
+      { from_stop_id: 'F20S', to_stop_id: 'A41S', min_transfer_time: 0 }, // F southbound to C southbound
+      { from_stop_id: 'A41N', to_stop_id: 'F20N', min_transfer_time: 0 }, // C northbound to F northbound
+      { from_stop_id: 'A41S', to_stop_id: 'F20S', min_transfer_time: 0 }, // C southbound to F southbound
       
       // 23rd St transfers (F to 6 train)
       { from_stop_id: 'F22N', to_stop_id: '635N', min_transfer_time: 180 }, // F to 6 northbound

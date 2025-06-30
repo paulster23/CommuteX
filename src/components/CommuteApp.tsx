@@ -140,7 +140,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
             </View>
             <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={{ fontSize: 13, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
-                <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
+                Walk to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
               </Text>
               <Text style={{ fontSize: 11, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>{route.walkingToTransit} min</Text>
             </View>
@@ -172,7 +172,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
               </View>
               <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
-                  <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
+                  Take {subwayLine} train to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
                 </Text>
                 <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>
                   {route.transitTime || (parseInt(route.duration.replace(' min', '')) - (route.walkingToTransit || 0) - (route.waitTime || 0) - (route.finalWalkingTime || 0))} min
@@ -196,7 +196,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                       </View>
                       <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
-                          <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text>
+                          Take {firstLine} train to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text>
                         </Text>
                         <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>{route.firstTransitTime || 12} min</Text>
                       </View>
@@ -204,15 +204,15 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                     
                     {/* Transfer step */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#E8F4FD', marginRight: 12 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '600' }}>🔄</Text>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF3CD', marginRight: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600' }}>⏱️</Text>
                       </View>
                       <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
-                          <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{transferStation}</Text>
+                          Wait for the <Text style={{ fontWeight: '600', color: colors.subway[secondLine as keyof typeof colors.subway] || styles.theme.colors.primary }}>{secondLine}</Text> train
                         </Text>
-                        <Text style={{ fontSize: 12, color: styles.theme.colors.primary, fontWeight: '600', marginRight: 8 }}>
-                          {route.transferWaitTime || 2} min
+                        <Text style={{ fontSize: 12, color: '#FF6B35', fontWeight: '600', marginRight: 8 }}>
+                          {route.transferWaitTime || 2} min wait
                         </Text>
                       </View>
                     </View>
@@ -224,7 +224,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
                       </View>
                       <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
-                          <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
+                          Take {secondLine} train to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.endingStation}</Text>
                         </Text>
                         <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>{route.secondTransitTime || 10} min</Text>
                       </View>
@@ -244,7 +244,7 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
               </View>
               <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ fontSize: 14, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
-                  Destination
+                  Walk to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>destination</Text>
                 </Text>
                 <Text style={{ fontSize: 12, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>
                   {route.finalWalkingTime ? `${route.finalWalkingTime} min` : route.walkingDistance}
