@@ -972,4 +972,94 @@ describe('RealMTAService', () => {
     expect(morningPath.metadata.dataSource).toContain('integrated');
     expect(morningPath.metadata.algorithmType).toBe('time_dependent_dijkstra');
   });
+
+  // NEW TEST: Direct test for transit time calculation bug
+  test('shouldCalculateCorrectTransitTimeFromGTFSData', () => {
+    // Test with realistic F train Carroll St to 23rd St trip data
+    const mockTrip = {
+      trip: { routeId: 'F' },
+      stopTimeUpdate: [
+        {
+          stopId: 'F18',
+          stopSequence: 1,
+          departure: { time: 1640995200 }, // 2021-12-31 16:00:00 UTC
+          arrival: { time: 1640995200 }
+        },
+        {
+          stopId: 'F20', 
+          stopSequence: 2,
+          departure: { time: 1640995500 }, // 2021-12-31 16:05:00 UTC (5 min later)
+          arrival: { time: 1640995500 }
+        },
+        {
+          stopId: 'F22',
+          stopSequence: 3,  
+          departure: { time: 1640996880 }, // 2021-12-31 16:28:00 UTC (28 min from start)
+          arrival: { time: 1640996880 }
+        }
+      ]
+    };
+
+    const transitTime = (service as any).calculateTransitTimeFromGTFS(mockTrip);
+
+    // Should calculate 28 minutes (1680 seconds / 60 = 28 minutes)
+    expect(transitTime).toBe(28);
+    expect(transitTime).toBeGreaterThan(20); // Should be more than 20 minutes
+    expect(transitTime).toBeLessThan(35); // Should be less than 35 minutes
+  });
+
+  // NEW TEST: Test the problematic case that was giving 1 minute
+  test('shouldHandleShortTransitTimeCorrectly', () => {
+    // Test with timestamps very close together (the problematic case)
+    const mockTrip = {
+      trip: { routeId: 'F' },
+      stopTimeUpdate: [
+        {
+          stopId: 'F18',
+          stopSequence: 1,
+          departure: { time: 1640995200 }, // 2021-12-31 16:00:00 UTC
+          arrival: { time: 1640995200 }
+        },
+        {
+          stopId: 'F22',
+          stopSequence: 2,
+          departure: { time: 1640995230 }, // 2021-12-31 16:00:30 UTC (30 seconds later)
+          arrival: { time: 1640995230 }
+        }
+      ]
+    };
+
+    const transitTime = (service as any).calculateTransitTimeFromGTFS(mockTrip);
+
+    // With the fix, unreasonably short times should now use fallback
+    // F train fallback is 28 minutes (this was the root cause of the bug)
+    expect(transitTime).toBe(28); // Should use fallback estimate for F train
+  });
+
+  // NEW TEST: Test fallback behavior for unreasonably short transit times  
+  test('shouldUseFallbackForUnreasonablyShortTransitTimes', () => {
+    const mockTrip = {
+      trip: { routeId: 'F' },
+      stopTimeUpdate: [
+        {
+          stopId: 'F18',
+          stopSequence: 1,
+          departure: { time: 1640995200 },
+          arrival: { time: 1640995200 }
+        },
+        {
+          stopId: 'F22',
+          stopSequence: 2, 
+          departure: { time: 1640995230 }, // Only 30 seconds later
+          arrival: { time: 1640995230 }
+        }
+      ]
+    };
+
+    const transitTime = (service as any).calculateTransitTimeFromGTFS(mockTrip);
+    
+    // With the updated logic, short times should trigger fallback
+    // F train fallback is 28 minutes
+    expect(transitTime).toBe(28); // Should use fallback estimate for F train
+  });
 });

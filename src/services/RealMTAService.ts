@@ -1252,7 +1252,7 @@ export class RealMTAService {
     // Count direct routes (non-transfer routes)
     const directRoutes = routes.filter(route => route.transfers === 0);
     
-    if (directRoutes.length === 0 && workingFeeds.length === 0) {
+    if (directRoutes.length === 0) {
       console.warn('[WARN] No direct routes built from GTFS data - creating estimated direct routes');
       
       // Create estimated routes when GTFS feeds are unavailable
@@ -1398,10 +1398,10 @@ export class RealMTAService {
       });
       
       // Get next 3 departures for the first station
-      const nextDepartures = isRealTimeData && allGtfsData ? this.getNext3Departures(
+      const nextDepartures = isRealTimeData && allGtfsData && allGtfsData[routeIdStr] ? this.getNext3Departures(
         stationInfo.startingStation,
         routeIdStr,
-        allGtfsData,
+        this.findRelevantTrips(allGtfsData[routeIdStr], [routeIdStr]),
         new Date()
       ) : this.createEstimatedNextDepartures(routeIdStr, new Date(), walkingTime);
 
@@ -1582,7 +1582,20 @@ export class RealMTAService {
         const firstStop = stopTimes[0];
         const lastStop = stopTimes[stopTimes.length - 1];
         
-        const transitTime = Math.round((lastStop.arrival.time - firstStop.departure.time) / 60);
+        // GTFS real-time timestamps are in Unix seconds, so we need to convert to minutes
+        const transitTimeSeconds = lastStop.arrival.time - firstStop.departure.time;
+        const transitTime = Math.round(transitTimeSeconds / 60);
+        
+        // If the calculated time is unreasonably short, fall back to route estimates
+        // This handles cases where GTFS real-time data has incorrect timestamps
+        if (transitTime < 5) {
+          const routeId = trip?.trip?.routeId || 'unknown';
+          const transitTimes: { [key: string]: number } = {
+            'R': 35, 'F': 28, '4': 25, 'B61': 42, 'G': 45, 'N': 32, 'Q': 30, 'W': 33, 'A': 30, 'C': 32, 'L': 25
+          };
+          return transitTimes[routeId] || 35;
+        }
+        
         return Math.max(1, transitTime); // At least 1 minute
       }
     }
@@ -2162,10 +2175,10 @@ export class RealMTAService {
       });
       
       // Get next 3 departures for the first station using real data (if available)
-      const nextDepartures = isRealTimeData ? this.getNext3Departures(
+      const nextDepartures = isRealTimeData && allGtfsData && allGtfsData[firstLine] ? this.getNext3Departures(
         mapping.startingStation,
         firstLine,
-        allGtfsData,
+        this.findRelevantTrips(allGtfsData[firstLine], [firstLine]),
         new Date()
       ) : this.createEstimatedNextDepartures(firstLine, new Date(), walkingTime);
       
