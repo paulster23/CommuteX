@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Animated, useColorScheme, Platform } from 'react-native';
 import { ArrowDown, ArrowUp, Zap } from 'lucide-react-native';
-import { RealMTAService, Route } from '../services/RealMTAService';
+import { RealMTAService, Route, DataSourceType } from '../services/RealMTAService';
 import { TransferRouteIcon } from './TransferRouteIcon';
 import { TrainDeparturePills } from './TrainDeparturePills';
-import { RouteStepsDisplay } from './RouteStepsDisplay';
 import { getThemeStyles } from '../design/components';
 import { colors } from '../design/theme';
 
@@ -16,6 +15,20 @@ const COMMUTE_DATA = {
 
 // NYC Subway line colors (official MTA colors)
 // Subway colors moved to design system
+
+// Helper function to get data source indicator color
+const getDataSourceColor = (dataSource: DataSourceType): string => {
+  switch (dataSource) {
+    case 'realtime':
+      return '#34C759'; // Green - Live GTFS data
+    case 'estimate':
+      return '#FF9500'; // Orange/Yellow - Estimated data
+    case 'fixed':
+      return '#FF3B30'; // Red - Fixed data
+    default:
+      return '#8E8E93'; // Gray - Unknown
+  }
+};
 
 interface RouteCardProps {
   route: Route;
@@ -134,34 +147,97 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
           }}
         >
           
-          {/* Walking Step */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <View style={{ width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: styles.theme.colors.borderLight, marginRight: 10 }}>
-              <Text style={{ fontSize: 10, fontWeight: '600' }}>🚶</Text>
-            </View>
-            <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 13, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
-                Walk to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
-              </Text>
-              <Text style={{ fontSize: 11, color: styles.theme.colors.textSecondary, fontWeight: '500', marginRight: 8 }}>{route.walkingToTransit} min</Text>
-            </View>
-          </View>
+          {/* Dynamic Route Steps with Data Source Indicators */}
+          {route.steps ? (
+            // Use detailed steps when available
+            route.steps.map((step, index) => {
+              const stepIcon = step.type === 'walk' ? '🚶' : 
+                              step.type === 'wait' ? '⏱️' : 
+                              step.type === 'transit' ? step.line || '🚇' : 
+                              step.type === 'transfer' ? '🔄' : '📍';
+              
+              const dotColor = getDataSourceColor(step.dataSource);
+              
+              return (
+                <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <View style={{ width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: step.type === 'transit' ? colors.subway[step.line as keyof typeof colors.subway] || styles.theme.colors.borderLight : styles.theme.colors.borderLight, marginRight: 10 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: step.type === 'transit' ? '#fff' : '#000' }}>
+                      {step.type === 'transit' ? step.line : stepIcon}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+                      {step.description}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ 
+                        width: 8, 
+                        height: 8, 
+                        borderRadius: 4, 
+                        backgroundColor: dotColor, 
+                        marginRight: 6 
+                      }} />
+                      <Text style={{ fontSize: 11, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>
+                        {step.duration} min
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })
+          ) : (
+            // Fallback to old hardcoded steps when route.steps is not available
+            <>
+              {/* Walking Step */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                <View style={{ width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: styles.theme.colors.borderLight, marginRight: 10 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '600' }}>🚶</Text>
+                </View>
+                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+                    Walk to <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ 
+                      width: 8, 
+                      height: 8, 
+                      borderRadius: 4, 
+                      backgroundColor: getDataSourceColor('fixed'), 
+                      marginRight: 6 
+                    }} />
+                    <Text style={{ fontSize: 11, color: styles.theme.colors.textSecondary, fontWeight: '500' }}>
+                      {route.walkingToTransit} min
+                    </Text>
+                  </View>
+                </View>
+              </View>
 
-          {/* Wait Step */}
-          {route.waitTime && route.waitTime > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <View style={{ width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF3CD', marginRight: 10 }}>
-                <Text style={{ fontSize: 10, fontWeight: '600' }}>⏱️</Text>
-              </View>
-              <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 13, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
-                  Wait at <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
-                </Text>
-                <Text style={{ fontSize: 11, color: '#FF6B35', fontWeight: '600', marginRight: 8 }}>
-                  {route.waitTime} min wait
-                </Text>
-              </View>
-            </View>
+              {/* Wait Step */}
+              {route.waitTime && route.waitTime > 0 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <View style={{ width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF3CD', marginRight: 10 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '600' }}>⏱️</Text>
+                  </View>
+                  <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, flex: 1, color: styles.theme.colors.text, marginRight: 8 }}>
+                      Wait at <Text style={{ fontWeight: '600', color: styles.theme.colors.primary }}>{route.startingStation}</Text>
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ 
+                        width: 8, 
+                        height: 8, 
+                        borderRadius: 4, 
+                        backgroundColor: getDataSourceColor(route.isRealTimeData ? 'realtime' : 'estimate'), 
+                        marginRight: 6 
+                      }} />
+                      <Text style={{ fontSize: 11, color: '#FF6B35', fontWeight: '600' }}>
+                        {route.waitTime} min wait
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </>
           )}
 
           {/* Transit Step(s) - Handle transfers */}
@@ -255,8 +331,6 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
           )}
         </View>
 
-        {/* Route Steps Display with Data Source Indicators */}
-        <RouteStepsDisplay steps={route.steps || []} isExpanded={isExpanded} />
 
         {/* Confidence & Additional Info */}
         <View 
