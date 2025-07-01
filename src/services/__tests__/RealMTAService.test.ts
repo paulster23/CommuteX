@@ -16,6 +16,34 @@ describe('RealMTAService', () => {
     jest.restoreAllMocks();
   });
 
+  test('shouldCalculateAccurateTransitTimeFromGTFS', () => {
+    // Red: Test that GTFS real-time data produces accurate transit times without fallback estimates
+    const mockTrip = {
+      trip: { routeId: 'F' },
+      stopTimeUpdate: [
+        {
+          stopId: 'F18', // Carroll St
+          stopSequence: 1,
+          arrival: { time: 1487415600 },
+          departure: { time: 1487415630 } // Depart at 1487415630
+        },
+        {
+          stopId: 'F16', // 23rd St  
+          stopSequence: 10,
+          arrival: { time: 1487417230 }, // Arrive 1600 seconds (26.7 min) later - realistic!
+          departure: { time: 1487417260 }
+        }
+      ]
+    };
+
+    const result = (service as any).calculateTransitTimeFromGTFS(mockTrip);
+
+    // Should calculate the actual 27-minute transit time from GTFS data
+    expect(result).toBe(27); // (1487417230 - 1487415630) / 60 = 26.67 rounded to 27
+    expect(result).not.toBeNull(); // Should return real GTFS time, not null
+    expect(result).toBeGreaterThan(20); // Should be realistic for F train Carroll St to 23rd St
+  });
+
   test('shouldParseStopTimeUpdatesFromGTFSData', () => {
     // Red: Write failing test for parsing stopTimeUpdate data
     const mockTripUpdate = {

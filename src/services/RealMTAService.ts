@@ -1371,8 +1371,14 @@ export class RealMTAService {
       // Use station-specific final walking time
       const finalWalkingTime = stationInfo.finalWalkingTime;
       
-      // Calculate transit time - will use GTFS or fallback
+      // Calculate transit time using real GTFS data only
       const transitTime = this.calculateTransitTimeFromGTFS(trip);
+      
+      // Skip this route if we can't get real GTFS transit time
+      if (transitTime === null) {
+        console.warn(`[WARN] Skipping route ${routeIdStr} - no valid GTFS transit time available`);
+        return null;
+      }
       
       // Determine if this route is using real-time data
       const isRealTimeData = !!(trip?.stopTimeUpdate && allGtfsData);
@@ -1570,43 +1576,49 @@ export class RealMTAService {
     });
   }
 
-  private calculateTransitTimeFromGTFS(trip: any): number {
-    // Try to use real GTFS trip data first
-    if (trip?.stopTimeUpdate && trip.stopTimeUpdate.length >= 2) {
-      // Get first and last stop times from trip
-      const stopTimes = trip.stopTimeUpdate
-        .filter((stu: any) => stu.departure?.time && stu.arrival?.time)
-        .sort((a: any, b: any) => a.stopSequence - b.stopSequence);
-      
-      if (stopTimes.length >= 2) {
-        const firstStop = stopTimes[0];
-        const lastStop = stopTimes[stopTimes.length - 1];
-        
-        // GTFS real-time timestamps are in Unix seconds, so we need to convert to minutes
-        const transitTimeSeconds = lastStop.arrival.time - firstStop.departure.time;
-        const transitTime = Math.round(transitTimeSeconds / 60);
-        
-        // If the calculated time is unreasonably short, fall back to route estimates
-        // This handles cases where GTFS real-time data has incorrect timestamps
-        if (transitTime < 5) {
-          const routeId = trip?.trip?.routeId || 'unknown';
-          const transitTimes: { [key: string]: number } = {
-            'R': 35, 'F': 28, '4': 25, 'B61': 42, 'G': 45, 'N': 32, 'Q': 30, 'W': 33, 'A': 30, 'C': 32, 'L': 25
-          };
-          return transitTimes[routeId] || 35;
-        }
-        
-        return Math.max(1, transitTime); // At least 1 minute
-      }
+  private calculateTransitTimeFromGTFS(trip: any): number | null {
+    if (!trip?.stopTimeUpdate || !Array.isArray(trip.stopTimeUpdate)) {
+      console.warn('[WARN] No valid stopTimeUpdate data in trip for transit time calculation');
+      return null;
     }
+
+    // Filter and sort stops with valid arrival/departure times
+    const stopTimes = trip.stopTimeUpdate
+      .filter((update: any) => {
+        // More robust validation of time data
+        const hasValidArrival = update.arrival && typeof update.arrival.time === 'number' && update.arrival.time > 0;
+        const hasValidDeparture = update.departure && typeof update.departure.time === 'number' && update.departure.time > 0;
+        const hasValidSequence = typeof update.stopSequence === 'number';
+        
+        return hasValidArrival && hasValidDeparture && hasValidSequence;
+      })
+      .sort((a: any, b: any) => a.stopSequence - b.stopSequence);
     
-    // Fallback: Use route-based estimates
-    const routeId = trip?.trip?.routeId || 'unknown';
-    const transitTimes: { [key: string]: number } = {
-      'R': 35, 'F': 28, '4': 25, 'B61': 42, 'G': 45, 'N': 32, 'Q': 30, 'W': 33, 'A': 30, 'C': 32, 'L': 25
-    };
+    if (stopTimes.length < 2) {
+      console.warn('[WARN] Insufficient valid stop times for transit calculation - need at least 2 stops');
+      return null;
+    }
+
+    const firstStop = stopTimes[0];
+    const lastStop = stopTimes[stopTimes.length - 1];
     
-    return transitTimes[routeId] || 35; // Default 35 minutes
+    // GTFS real-time timestamps are in Unix seconds, convert to minutes
+    const transitTimeSeconds = lastStop.arrival.time - firstStop.departure.time;
+    const transitTime = Math.round(transitTimeSeconds / 60);
+    
+    // Log for debugging GTFS data quality
+    console.log(`[DEBUG] GTFS transit time calculation:`, {
+      routeId: trip?.trip?.routeId,
+      firstStop: firstStop.stopId,
+      lastStop: lastStop.stopId,
+      firstDeparture: new Date(firstStop.departure.time * 1000).toISOString(),
+      lastArrival: new Date(lastStop.arrival.time * 1000).toISOString(),
+      transitTimeMinutes: transitTime,
+      stopCount: stopTimes.length
+    });
+    
+    // Return the calculated time - let calling code decide what to do with unusual values
+    return transitTime;
   }
 
   private createEstimatedRoutes(walkingTimes: any, startingRouteId: number): Route[] {
