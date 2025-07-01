@@ -1396,7 +1396,8 @@ export class RealMTAService {
       
       // Determine if this route is using real-time data
       const isRealTimeData = !!(trip?.stopTimeUpdate && allGtfsData);
-      console.log(`[DEBUG] Route ${routeIdStr} using real-time data: ${isRealTimeData}`);
+      const usedFallbackTime = !!(trip as any).__usedFallbackTime;
+      console.log(`[DEBUG] Route ${routeIdStr} using real-time data: ${isRealTimeData}, used fallback time: ${usedFallbackTime}`);
       
       const totalTime = walkingTime + waitInfo.waitTime + transitTime + finalWalkingTime;
       
@@ -1448,7 +1449,7 @@ export class RealMTAService {
           type: 'transit',
           description: `${routeIdStr} train to ${stationInfo.endingStation}`,
           duration: transitTime,
-          dataSource: isRealTimeData ? 'realtime' : 'estimate', // Transit time from GTFS or estimate
+          dataSource: usedFallbackTime ? 'estimate' : (isRealTimeData ? 'realtime' : 'estimate'), // Use 'estimate' if fallback was used
           line: routeIdStr,
           fromStation: stationInfo.startingStation,
           toStation: stationInfo.endingStation
@@ -1692,7 +1693,53 @@ export class RealMTAService {
       stopCount: stopTimes.length
     });
     
-    // Return the calculated time - let calling code decide what to do with unusual values
+    // Validate transit time for realistic subway routes
+    // Subway routes should take at least 5 minutes for any meaningful distance
+    if (transitTime < 5) {
+      console.warn(`[WARN] Unrealistic transit time of ${transitTime} minutes detected for ${trip?.trip?.routeId} - using fallback estimate`);
+      
+      // Return estimated transit time for this route instead of null
+      const routeEstimates: { [key: string]: number } = {
+        'F': 28,
+        'R': 35,
+        '4': 25,
+        'A': 22,
+        'C': 24,
+        'G': 20,
+        'L': 18
+      };
+      
+      const fallbackTime = routeEstimates[trip?.trip?.routeId] || 25; // Default 25 min
+      console.log(`[DEBUG] Using fallback transit time of ${fallbackTime} minutes for ${trip?.trip?.routeId}`);
+      
+      // Mark this as fallback data by adding a property to the trip
+      (trip as any).__usedFallbackTime = true;
+      
+      return fallbackTime;
+    }
+    
+    // Also handle negative times (data corruption)
+    if (transitTime < 0) {
+      console.warn(`[WARN] Negative transit time of ${transitTime} minutes detected for ${trip?.trip?.routeId} - using fallback estimate`);
+      
+      const routeEstimates: { [key: string]: number } = {
+        'F': 28,
+        'R': 35,
+        '4': 25,
+        'A': 22,
+        'C': 24,
+        'G': 20,
+        'L': 18
+      };
+      
+      const fallbackTime = routeEstimates[trip?.trip?.routeId] || 25;
+      
+      // Mark this as fallback data
+      (trip as any).__usedFallbackTime = true;
+      
+      return fallbackTime;
+    }
+    
     return transitTime;
   }
 
