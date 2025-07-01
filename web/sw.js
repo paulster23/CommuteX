@@ -1,10 +1,12 @@
-const CACHE_NAME = 'commutex-v1';
+const CACHE_NAME = 'commutex-v2-standalone';
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
   '../assets/icon.png',
-  '../assets/favicon.png'
+  '../assets/favicon.png',
+  '/static/js/bundle.js',
+  '/static/css/main.css'
 ];
 
 // Install event - cache resources
@@ -20,14 +22,26 @@ self.addEventListener('install', (event) => {
 
 // Fetch event - serve from cache when offline
 self.addEventListener('fetch', (event) => {
+  // Skip cross-origin requests
+  if (!event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Return cached version or fetch from network
+        // Return cached version or fetch from network with fallback
         if (response) {
           return response;
         }
-        return fetch(event.request);
+        
+        return fetch(event.request).catch(() => {
+          // If fetch fails and it's a navigation request, return the cached index.html
+          if (event.request.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+          throw new Error('Network request failed and no cached version available');
+        });
       }
     )
   );

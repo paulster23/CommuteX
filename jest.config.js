@@ -14,7 +14,7 @@ module.exports = {
     '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|expo|@expo|@expo/vector-icons|react-native-vector-icons|@react-native-async-storage|react-native-gesture-handler|react-native-reanimated)/)',
+    'node_modules/(?!(react-native|@react-native|expo|@expo|@expo/vector-icons|react-native-vector-icons|@react-native-async-storage|react-native-gesture-handler|react-native-reanimated|@react-navigation|react-native-screens|react-native-safe-area-context|lucide-react-native)/)',
   ],
   testEnvironment: 'node',
 };

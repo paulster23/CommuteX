@@ -1,27 +1,143 @@
 {
-  "name": "CommuteX",
+  "name": "CommuteX - NYC Real-Time Transit",
   "short_name": "CommuteX",
-  "description": "Real-time NYC commute planning app",
-  "start_url": "/",
+  "description": "Real-time NYC subway and bus commute planning with live MTA data",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#F8F9FA",
   "theme_color": "#007AFF",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false,
   "icons": [
+    {
+      "src": "../assets/icon.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/icon.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/icon.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/icon.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/icon.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "../assets/icon.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/icon.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "../assets/icon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "../assets/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "categories": ["travel", "navigation", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Home",
+      "short_name": "Home",
+      "description": "View current commute and next departures",
+      "url": "/?shortcut=home",
+      "icons": [
+        {
+          "src": "../assets/icon.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Routes",
+      "short_name": "Routes",
+      "description": "Plan alternative routes",
+      "url": "/?shortcut=routes",
+      "icons": [
+        {
+          "src": "../assets/icon.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Live Updates",
+      "short_name": "Live",
+      "description": "Real-time service alerts",
+      "url": "/?shortcut=live",
+      "icons": [
+        {
+          "src": "../assets/icon.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "../assets/icon.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "CommuteX main interface showing real-time train departures"
+    },
+    {
+      "src": "../assets/icon.png", 
+      "sizes": "720x540",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "CommuteX route planning interface"
+    }
+  ],
+  "categories": ["travel", "navigation", "productivity", "utilities"],
   "lang": "en-US",
-  "dir": "ltr"
+  "dir": "ltr",
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "related_applications": [],
+  "iarc_rating_id": "",
+  "protocol_handlers": [
+    {
+      "protocol": "web+commutex",
+      "url": "/?handler=%s"
+    }
+  ]
 }
