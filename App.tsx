@@ -22,7 +22,9 @@ export default function App() {
         document.body.style.userSelect = 'none';
         document.body.style.webkitUserSelect = 'none';
         document.body.style.webkitTouchCallout = 'none';
-        document.body.style.overscrollBehavior = 'none';
+        // Allow overscroll for pull-to-refresh functionality
+        document.body.style.overscrollBehaviorX = 'none';
+        document.body.style.overscrollBehaviorY = 'auto';
       }
     }
   }, []);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Animated, useColorScheme } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Animated, useColorScheme, Platform } from 'react-native';
 import { ArrowDown, ArrowUp, Zap } from 'lucide-react-native';
 import { RealMTAService, Route } from '../services/RealMTAService';
 import { TransferRouteIcon } from './TransferRouteIcon';
@@ -394,12 +394,15 @@ export function CommuteApp() {
         testID="scroll-view"
         style={{ flex: 1, paddingHorizontal: 20 }}
         showsVerticalScrollIndicator={false}
+        bounces={Platform.OS === 'ios'}
+        alwaysBounceVertical={Platform.OS === 'ios'}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={styles.theme.colors.primary}
             colors={[styles.theme.colors.primary]}
+            progressBackgroundColor={styles.theme.colors.surface}
           />
         }
       >
