@@ -1,6 +1,18 @@
 import { StaticLocationProvider, LocationProvider } from './LocationService';
 import { StationMappingService } from './StationMappingService';
 
+export type DataSourceType = 'realtime' | 'estimate' | 'fixed';
+
+export interface RouteStep {
+  type: 'walk' | 'wait' | 'transit' | 'transfer';
+  description: string;
+  duration: number; // in minutes
+  dataSource: DataSourceType;
+  line?: string; // for transit steps
+  fromStation?: string;
+  toStation?: string;
+}
+
 export interface Route {
   id: number;
   arrivalTime: string;
@@ -29,6 +41,8 @@ export interface Route {
   firstTransitTime?: number; // first leg travel time for transfers
   secondTransitTime?: number; // second leg travel time for transfers
   transferWaitTime?: number; // time between trains during transfer
+  // Data source breakdown for each step
+  steps?: RouteStep[];
 }
 
 export interface GTFSData {
@@ -1204,7 +1218,7 @@ export class RealMTAService {
     console.log(`[DEBUG] Feed status - Working: ${workingFeeds.map(f => f.name).join(', ') || 'none'}, Failed: ${failedFeeds.join(', ') || 'none'}`);
     
     // Build direct routes from working feeds only
-    for (const feedInfo of workingFeeds.slice(0, 3)) { // Only first 3 are direct routes
+    for (const feedInfo of workingFeeds.slice(0, 5)) { // Expanded to first 5 direct routes
       if (allGtfsData[feedInfo.routes[0]]) { // Check if we have data for this route
         const gtfsData = allGtfsData[feedInfo.routes[0]];
         const relevantTrips = this.findRelevantTrips(gtfsData, feedInfo.routes);
@@ -1411,6 +1425,44 @@ export class RealMTAService {
         new Date()
       ) : this.createEstimatedNextDepartures(routeIdStr, new Date(), walkingTime);
 
+      // Build detailed route steps with data source tracking
+      const steps: RouteStep[] = [
+        {
+          type: 'walk',
+          description: `Walk to ${stationInfo.startingStation}`,
+          duration: walkingTime,
+          dataSource: 'fixed', // Walking times are fixed estimates
+          fromStation: 'Origin',
+          toStation: stationInfo.startingStation
+        },
+        {
+          type: 'wait',
+          description: `Wait for ${routeIdStr} train`,
+          duration: waitInfo.waitTime,
+          dataSource: isRealTimeData ? 'realtime' : 'estimate', // Wait time from GTFS or estimate
+          line: routeIdStr,
+          fromStation: stationInfo.startingStation,
+          toStation: stationInfo.startingStation
+        },
+        {
+          type: 'transit',
+          description: `${routeIdStr} train to ${stationInfo.endingStation}`,
+          duration: transitTime,
+          dataSource: isRealTimeData ? 'realtime' : 'estimate', // Transit time from GTFS or estimate
+          line: routeIdStr,
+          fromStation: stationInfo.startingStation,
+          toStation: stationInfo.endingStation
+        },
+        {
+          type: 'walk',
+          description: `Walk to destination`,
+          duration: finalWalkingTime,
+          dataSource: 'fixed', // Final walking times are fixed estimates
+          fromStation: stationInfo.endingStation,
+          toStation: 'Destination'
+        }
+      ];
+
       const route = {
         id: routeId,
         arrivalTime: arrivalTimeStr,
@@ -1428,7 +1480,8 @@ export class RealMTAService {
         nextTrainDeparture: waitInfo.nextTrainDeparture,
         finalWalkingTime: finalWalkingTime,
         transitTime: transitTime, // Add transit time for UI display
-        nextDepartures: nextDepartures // Add next 3 departures for pills
+        nextDepartures: nextDepartures, // Add next 3 departures for pills
+        steps: steps // Add detailed route steps with data source tracking
       };
       
       console.log(`[DEBUG] Built route using real GTFS data:`, route);
@@ -1533,6 +1586,27 @@ export class RealMTAService {
       
       const totalTime = walkingTime + transitTime;
       
+      // Build detailed route steps with data source tracking for bus routes
+      const steps: RouteStep[] = [
+        {
+          type: 'walk',
+          description: `Walk to B61 bus stop`,
+          duration: walkingTime,
+          dataSource: 'fixed', // Walking times are fixed estimates
+          fromStation: 'Origin',
+          toStation: 'B61 Bus Stop'
+        },
+        {
+          type: 'transit',
+          description: `B61 bus to destination`,
+          duration: transitTime,
+          dataSource: 'realtime', // Bus time from real GTFS data
+          line: 'B61',
+          fromStation: 'B61 Bus Stop',
+          toStation: 'Destination'
+        }
+      ];
+      
       return {
         id: routeId,
         arrivalTime,
@@ -1543,7 +1617,8 @@ export class RealMTAService {
         walkingDistance: '0.6 mi',
         walkingToTransit: walkingTime,
         isRealTimeData: true,
-        confidence: this.assessDataConfidence(trip)
+        confidence: this.assessDataConfidence(trip),
+        steps: steps // Add detailed route steps with data source tracking
       };
     } catch (error) {
       console.error(`[ERROR] Failed to build bus route from trip: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1645,6 +1720,44 @@ export class RealMTAService {
       // Create estimated next 3 departures for this line
       const nextDepartures = this.createEstimatedNextDepartures(config.line, currentTime, walkingTime);
       
+      // Build detailed route steps with data source tracking for estimated routes
+      const steps: RouteStep[] = [
+        {
+          type: 'walk',
+          description: `Walk to ${config.stationInfo.startingStation}`,
+          duration: walkingTime,
+          dataSource: 'fixed', // Walking times are fixed estimates
+          fromStation: 'Origin',
+          toStation: config.stationInfo.startingStation
+        },
+        {
+          type: 'wait',
+          description: `Wait for ${config.line} train`,
+          duration: estimatedWait,
+          dataSource: 'estimate', // Wait time is estimated when no real-time data
+          line: config.line,
+          fromStation: config.stationInfo.startingStation,
+          toStation: config.stationInfo.startingStation
+        },
+        {
+          type: 'transit',
+          description: `${config.line} train to ${config.stationInfo.endingStation}`,
+          duration: config.transitTime,
+          dataSource: 'estimate', // Transit time is estimated when no real-time data
+          line: config.line,
+          fromStation: config.stationInfo.startingStation,
+          toStation: config.stationInfo.endingStation
+        },
+        {
+          type: 'walk',
+          description: `Walk to destination`,
+          duration: config.stationInfo.finalWalkingTime,
+          dataSource: 'fixed', // Final walking times are fixed estimates
+          fromStation: config.stationInfo.endingStation,
+          toStation: 'Destination'
+        }
+      ];
+      
       routes.push({
         id: routeId++,
         arrivalTime: arrivalTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
@@ -1662,7 +1775,8 @@ export class RealMTAService {
         nextTrainDeparture: nextTrainTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
         finalWalkingTime: config.stationInfo.finalWalkingTime,
         transitTime: config.transitTime, // Actual train travel time
-        nextDepartures: nextDepartures // Add the next 3 departures for pills
+        nextDepartures: nextDepartures, // Add the next 3 departures for pills
+        steps: steps // Add detailed route steps with data source tracking
       });
     }
     
@@ -2043,6 +2157,102 @@ export class RealMTAService {
       ? `${optimalRoute.routes[0]} train + Walk`
       : `${optimalRoute.routes.join('→')} trains + Walk`;
     
+    // Build detailed route steps with data source tracking for optimal routes
+    const steps: RouteStep[] = [];
+    
+    // Add initial walk step
+    steps.push({
+      type: 'walk',
+      description: `Walk to ${startStation.name}`,
+      duration: walkingTime,
+      dataSource: 'fixed', // Walking times are fixed estimates
+      fromStation: 'Origin',
+      toStation: startStation.name
+    });
+    
+    if (transfers === 0) {
+      // Direct route: walk → wait → transit → walk
+      steps.push({
+        type: 'wait',
+        description: `Wait for ${optimalRoute.routes[0]} train`,
+        duration: 5, // Estimated wait time for static routes
+        dataSource: 'estimate', // Using static GTFS data
+        line: optimalRoute.routes[0],
+        fromStation: startStation.name,
+        toStation: startStation.name
+      });
+      steps.push({
+        type: 'transit',
+        description: `${optimalRoute.routes[0]} train to ${endStation.name}`,
+        duration: optimalRoute.totalTime,
+        dataSource: 'fixed', // Using static GTFS scheduling data
+        line: optimalRoute.routes[0],
+        fromStation: startStation.name,
+        toStation: endStation.name
+      });
+    } else {
+      // Transfer route: walk → wait → transit → transfer → wait → transit → walk
+      // This is a simplified version - actual transfer stations would need to be determined
+      const firstLine = optimalRoute.routes[0];
+      const secondLine = optimalRoute.routes[1];
+      const estimatedTransferStation = 'Transfer Station'; // Placeholder - would need actual transfer logic
+      
+      steps.push({
+        type: 'wait',
+        description: `Wait for ${firstLine} train`,
+        duration: 5, // Estimated wait time
+        dataSource: 'estimate',
+        line: firstLine,
+        fromStation: startStation.name,
+        toStation: startStation.name
+      });
+      steps.push({
+        type: 'transit',
+        description: `${firstLine} train to ${estimatedTransferStation}`,
+        duration: Math.floor(optimalRoute.totalTime * 0.6), // Rough estimate
+        dataSource: 'fixed',
+        line: firstLine,
+        fromStation: startStation.name,
+        toStation: estimatedTransferStation
+      });
+      steps.push({
+        type: 'transfer',
+        description: `Transfer at ${estimatedTransferStation}`,
+        duration: 3, // Estimated transfer time
+        dataSource: 'fixed',
+        fromStation: estimatedTransferStation,
+        toStation: estimatedTransferStation
+      });
+      steps.push({
+        type: 'wait',
+        description: `Wait for ${secondLine} train`,
+        duration: 5, // Estimated wait time
+        dataSource: 'estimate',
+        line: secondLine,
+        fromStation: estimatedTransferStation,
+        toStation: estimatedTransferStation
+      });
+      steps.push({
+        type: 'transit',
+        description: `${secondLine} train to ${endStation.name}`,
+        duration: Math.floor(optimalRoute.totalTime * 0.4), // Rough estimate
+        dataSource: 'fixed',
+        line: secondLine,
+        fromStation: estimatedTransferStation,
+        toStation: endStation.name
+      });
+    }
+    
+    // Add final walk step
+    steps.push({
+      type: 'walk',
+      description: `Walk to destination`,
+      duration: finalWalkingTime,
+      dataSource: 'fixed', // Final walking times are fixed estimates
+      fromStation: endStation.name,
+      toStation: 'Destination'
+    });
+    
     return {
       id: routeId,
       arrivalTime: arrivalTimeStr,
@@ -2056,7 +2266,8 @@ export class RealMTAService {
       startingStation: startStation.name,
       endingStation: endStation.name,
       finalWalkingTime: finalWalkingTime,
-      transitTime: optimalRoute.totalTime
+      transitTime: optimalRoute.totalTime,
+      steps: steps // Add detailed route steps with data source tracking
     };
   }
 
@@ -2194,6 +2405,73 @@ export class RealMTAService {
         new Date()
       ) : this.createEstimatedNextDepartures(firstLine, new Date(), walkingTime);
       
+      // Build detailed route steps with data source tracking for transfer routes
+      const firstTransitTime = preciseRoute.firstTransitTime || Math.round((preciseRoute.transferArrival.getTime() - preciseRoute.firstTrainDeparture.getTime()) / (60 * 1000));
+      const secondTransitTime = preciseRoute.secondTransitTime || Math.round((preciseRoute.finalArrival.getTime() - preciseRoute.secondTrainDeparture.getTime()) / (60 * 1000));
+      const waitTime = Math.round((preciseRoute.firstTrainDeparture.getTime() - new Date().getTime() - walkingTime * 60 * 1000) / (60 * 1000));
+      
+      const steps: RouteStep[] = [
+        {
+          type: 'walk',
+          description: `Walk to ${mapping.startingStation}`,
+          duration: walkingTime,
+          dataSource: 'fixed', // Walking times are fixed estimates
+          fromStation: 'Origin',
+          toStation: mapping.startingStation
+        },
+        {
+          type: 'wait',
+          description: `Wait for ${firstLine} train`,
+          duration: waitTime,
+          dataSource: isRealTimeData ? 'realtime' : 'estimate', // Wait time from GTFS or estimate
+          line: firstLine,
+          fromStation: mapping.startingStation,
+          toStation: mapping.startingStation
+        },
+        {
+          type: 'transit',
+          description: `${firstLine} train to ${mapping.transferStation}`,
+          duration: firstTransitTime,
+          dataSource: isRealTimeData ? 'realtime' : 'estimate', // Transit time from GTFS or estimate
+          line: firstLine,
+          fromStation: mapping.startingStation,
+          toStation: mapping.transferStation
+        },
+        {
+          type: 'transfer',
+          description: `Transfer at ${mapping.transferStation}`,
+          duration: mapping.transferWalkingTime,
+          dataSource: 'fixed', // Transfer walking times are fixed estimates
+          fromStation: mapping.transferStation,
+          toStation: mapping.transferStation
+        },
+        {
+          type: 'wait',
+          description: `Wait for ${secondLine} train`,
+          duration: preciseRoute.transferWaitTime,
+          dataSource: isRealTimeData ? 'realtime' : 'estimate', // Wait time from GTFS or estimate
+          line: secondLine,
+          fromStation: mapping.transferStation,
+          toStation: mapping.transferStation
+        },
+        {
+          type: 'transit',
+          description: `${secondLine} train to ${mapping.endingStation}`,
+          duration: secondTransitTime,
+          dataSource: isRealTimeData ? 'realtime' : 'estimate', // Transit time from GTFS or estimate
+          line: secondLine,
+          fromStation: mapping.transferStation,
+          toStation: mapping.endingStation
+        },
+        {
+          type: 'walk',
+          description: `Walk to destination`,
+          duration: mapping.finalWalkingTime,
+          dataSource: 'fixed', // Final walking times are fixed estimates
+          fromStation: mapping.endingStation,
+          toStation: 'Destination'
+        }
+      ];
       
       return {
         id: routeId,
@@ -2231,9 +2509,10 @@ export class RealMTAService {
           hour12: true 
         }),
         // Detailed timing breakdown for UI display
-        firstTransitTime: preciseRoute.firstTransitTime || Math.round((preciseRoute.transferArrival.getTime() - preciseRoute.firstTrainDeparture.getTime()) / (60 * 1000)),
-        secondTransitTime: preciseRoute.secondTransitTime || Math.round((preciseRoute.finalArrival.getTime() - preciseRoute.secondTrainDeparture.getTime()) / (60 * 1000)),
-        transferWaitTime: preciseRoute.transferWaitTime
+        firstTransitTime: firstTransitTime,
+        secondTransitTime: secondTransitTime,
+        transferWaitTime: preciseRoute.transferWaitTime,
+        steps: steps // Add detailed route steps with data source tracking
       };
     } catch (error) {
       console.error(`[ERROR] Failed to build transfer route ${routeKey}:`, error);

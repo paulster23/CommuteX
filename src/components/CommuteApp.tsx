@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Zap } from 'lucide-react-native';
 import { RealMTAService, Route } from '../services/RealMTAService';
 import { TransferRouteIcon } from './TransferRouteIcon';
 import { TrainDeparturePills } from './TrainDeparturePills';
+import { RouteStepsDisplay } from './RouteStepsDisplay';
 import { getThemeStyles } from '../design/components';
 import { colors } from '../design/theme';
 
@@ -253,6 +254,9 @@ function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCardProps)
             </View>
           )}
         </View>
+
+        {/* Route Steps Display with Data Source Indicators */}
+        <RouteStepsDisplay steps={route.steps || []} isExpanded={isExpanded} />
 
         {/* Confidence & Additional Info */}
         <View 
