@@ -9,48 +9,6 @@ interface TrainDeparturePillsProps {
   stationName: string;
 }
 
-// Mock data for F trains at Carroll St and C trains at Jay St-MetroTech
-const getFTrainDepartures = (): NextTrainDeparture[] => {
-  const now = new Date();
-  return [
-    {
-      trainLine: 'F',
-      departureTime: new Date(now.getTime() + 3 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      minutesAway: 3
-    },
-    {
-      trainLine: 'F',
-      departureTime: new Date(now.getTime() + 8 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      minutesAway: 8
-    },
-    {
-      trainLine: 'F',
-      departureTime: new Date(now.getTime() + 14 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      minutesAway: 14
-    }
-  ];
-};
-
-const getCTrainDepartures = (): NextTrainDeparture[] => {
-  const now = new Date();
-  return [
-    {
-      trainLine: 'C',
-      departureTime: new Date(now.getTime() + 5 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      minutesAway: 5
-    },
-    {
-      trainLine: 'C',
-      departureTime: new Date(now.getTime() + 12 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      minutesAway: 12
-    },
-    {
-      trainLine: 'C',
-      departureTime: new Date(now.getTime() + 18 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      minutesAway: 18
-    }
-  ];
-};
 
 export function TrainDeparturePills({ departures, stationName }: TrainDeparturePillsProps) {
   const colorScheme = useColorScheme();
@@ -119,16 +77,42 @@ export function TrainDeparturePills({ departures, stationName }: TrainDepartureP
     </View>
   );
 
-  const fTrains = getFTrainDepartures();
-  const cTrains = getCTrainDepartures();
+  // Use real GTFS data from props instead of hardcoded mock data
+  if (!departures || departures.length === 0) {
+    return (
+      <View style={{ marginBottom: 12 }}>
+        <Text style={{ 
+          fontSize: 12, 
+          color: styles.theme.colors.textSecondary, 
+          marginBottom: 6,
+          textAlign: 'center'
+        }}>
+          No departures available from {stationName}
+        </Text>
+      </View>
+    );
+  }
+
+  // Group departures by train line
+  const groupedDepartures = departures.reduce((acc, departure) => {
+    if (!acc[departure.trainLine]) {
+      acc[departure.trainLine] = [];
+    }
+    acc[departure.trainLine].push(departure);
+    return acc;
+  }, {} as { [key: string]: NextTrainDeparture[] });
 
   return (
     <View style={{ marginBottom: 12 }}>
-      {/* F trains at Carroll St */}
-      {renderTrainRow(fTrains, 'Carroll St')}
-      
-      {/* C trains at Jay St-MetroTech */}
-      {renderTrainRow(cTrains, 'Jay St-MetroTech')}
+      {Object.entries(groupedDepartures).map(([trainLine, trains]) => {
+        // Use different station names for different train lines
+        const displayStationName = trainLine === 'C' ? 'Jay St-MetroTech' : stationName;
+        return (
+          <View key={trainLine}>
+            {renderTrainRow(trains, displayStationName)}
+          </View>
+        );
+      })}
     </View>
   );
 }

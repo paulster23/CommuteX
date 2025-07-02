@@ -1,0 +1,33 @@
+{
+  "trainFrequencies": {
+    "F": 6,
+    "R": 8,
+    "4": 5,
+    "N": 8,
+    "Q": 7,
+    "W": 10,
+    "A": 6,
+    "C": 8,
+    "L": 5
+  },
+  "defaultFrequency": 8,
+  "routeTransitTimes": {
+    "F": 28,
+    "R": 35,
+    "4": 25,
+    "A": 22,
+    "C": 24,
+    "G": 20,
+    "L": 18
+  },
+  "defaultTransitTime": 25,
+  "walkingSpeed": {
+    "milesPerHour": 3,
+    "minutesPerMile": 20
+  },
+  "waitTimeRange": {
+    "minMinutes": 2,
+    "maxAdditionalMinutes": 6
+  },
+  "minimumRealisticTransitTime": 5
+}

@@ -107,3 +107,12 @@ When approaching a new feature:
 Follow this process precisely, always prioritizing clean, well-tested code over quick implementation.
 
 Always write one test at a time, make it run, then improve structure. Always run all the tests (except long-running tests) each time.
+
+# PROJECT SPECIFIC RULES
+When getting times for MTA subway trains or busses, never use mock data. I use this app to plan my trips, and mock data gives me false schedules. The MTA GTFS feeds are very reliable and accessible. Always use them.
+
+This app has one user, me. I amd not concerned with scalabilty at this point. Take this into consideration when making performance improvements and cacheuing. 
+
+When finding routes for me on the subway, use Djikstra's algorithm. These open source projects can be used as inspiration:
+https://github.com/t-foote/NYCSubwayChallenge
+https://github.com/qqrs/mta-routes
