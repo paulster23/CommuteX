@@ -109,7 +109,7 @@ export const createHeaderStyles = (theme: Theme) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xxl + spacing.lg, // Account for status bar
+    paddingTop: spacing.xl, // Reduced padding for better consistency
     paddingBottom: spacing.lg,
     backgroundColor: theme.colors.background,
   },
