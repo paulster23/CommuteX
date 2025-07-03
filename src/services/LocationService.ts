@@ -17,10 +17,14 @@ function calculateDistance(point1: Location, point2: Location): number {
   return distance;
 }
 
-// Calculate walking time with 25% speed increase (3.75 mph) and buffer time
-function calculateWalkingTime(distanceMiles: number, addBuffer: boolean = true): number {
-  const WALKING_SPEED_MPH = 3.75; // 25% faster than standard 3 mph
-  const baseTimeMinutes = (distanceMiles / WALKING_SPEED_MPH) * 60;
+// Borough-specific walking speeds
+const BROOKLYN_WALKING_SPEED_MPH = 3.75; // Faster in residential Brooklyn areas
+const MANHATTAN_WALKING_SPEED_MPH = 3.0; // Slower due to dense crowds and complex intersections
+
+// Calculate walking time with location-specific walking speed and buffer time
+function calculateWalkingTime(distanceMiles: number, addBuffer: boolean = true, walkingSpeedMph?: number): number {
+  const speed = walkingSpeedMph || MANHATTAN_WALKING_SPEED_MPH; // Default to Manhattan speed for safety
+  const baseTimeMinutes = (distanceMiles / speed) * 60;
   
   // Add buffer time for realistic conditions
   let bufferMinutes = 0;
@@ -93,9 +97,9 @@ export class StaticLocationProvider implements LocationProvider {
   }
 
   async getWalkingTime(origin: Location, destination: TransitStop): Promise<number> {
-    // Calculate real distance and walking time with 20% speed boost
+    // Calculate real distance and walking time with Brooklyn speed (home to Carroll St is all Brooklyn)
     const distance = calculateDistance(origin, destination.coordinates);
-    return calculateWalkingTime(distance, true);
+    return calculateWalkingTime(distance, true, BROOKLYN_WALKING_SPEED_MPH);
   }
 
   async getWalkingTimeToTransit(transitLine: string): Promise<number> {
@@ -150,8 +154,9 @@ export class StaticLocationProvider implements LocationProvider {
 
   // Get walking time from 23rd St station to work destination
   getWalkingTimeFromTwentyThirdSt(): number {
-    const distance = calculateDistance(this.twentyThirdStLocation, this.workLocation);
-    return calculateWalkingTime(distance, true);
+    // Use actual measured distance of 0.7 miles instead of Haversine calculation
+    const actualDistance = 0.7; // miles - real walking distance accounting for NYC street grid
+    return calculateWalkingTime(actualDistance, true, MANHATTAN_WALKING_SPEED_MPH);
   }
 
   // Get coordinates for specific locations
@@ -165,8 +170,9 @@ export class StaticLocationProvider implements LocationProvider {
 
   // Get walking time from work to 23rd St station (reverse of morning commute)
   async getWalkingTimeFromWorkToTwentyThirdSt(): Promise<number> {
-    const distance = calculateDistance(this.workLocation, this.twentyThirdStLocation);
-    return calculateWalkingTime(distance, true);
+    // Use actual measured distance of 0.7 miles instead of Haversine calculation
+    const actualDistance = 0.7; // miles - same route, real walking distance accounting for NYC street grid
+    return calculateWalkingTime(actualDistance, true, MANHATTAN_WALKING_SPEED_MPH);
   }
 
   // Get walking time from Carroll St station to home (reverse of morning commute)

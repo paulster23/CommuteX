@@ -9,7 +9,7 @@ describe('LocationService', () => {
     
     // Should calculate realistic walking time based on distance
     expect(walkingTime).toBeGreaterThan(0);
-    expect(walkingTime).toBeLessThan(15); // Should be reasonable walking time
+    expect(walkingTime).toBeLessThan(20); // Should be reasonable walking time (now ~15 mins with actual 0.7 mile distance)
   });
 
   test('shouldCalculateWalkingTimeFromCarrollStToHome', async () => {
@@ -18,7 +18,7 @@ describe('LocationService', () => {
     
     const walkingTime = await locationProvider.getWalkingTimeFromCarrollStToHome();
     
-    // Should return the same 12 minutes as the morning commute in reverse
+    // Should return the same ~12 minutes as the morning commute in reverse (with Brooklyn 3.75 mph speed)
     expect(walkingTime).toBe(12);
   });
 });

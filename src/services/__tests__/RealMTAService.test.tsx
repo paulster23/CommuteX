@@ -22,7 +22,7 @@ describe('RealMTAService', () => {
       expect(route.endingStation).toBe('Carroll St');
       expect(route.method).toContain('F train');
       expect(route.walkingToTransit).toBeGreaterThan(0); // Walking from work to 23rd St
-      expect(route.finalWalkingTime).toBe(12); // Walking from Carroll St to home
+      expect(route.finalWalkingTime).toBe(12); // Walking from Carroll St to home (with Brooklyn 3.75 mph speed)
     });
   });
 });

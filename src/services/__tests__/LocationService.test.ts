@@ -21,7 +21,7 @@ describe('LocationService', () => {
     );
     
     const walkingTime = await locationProvider.getWalkingTime(origin, fTrainStop!);
-    expect(walkingTime).toBe(12); // 12 minutes to F train (Carroll St) - calculated dynamically with 25% speed boost
+    expect(walkingTime).toBe(12); // 12 minutes to F train (Carroll St) - calculated dynamically with Brooklyn 3.75 mph speed
   });
 
   test('shouldCalculateWalkingTimeToB61Bus', async () => {
@@ -36,7 +36,7 @@ describe('LocationService', () => {
 
   test('shouldReturnShortestWalkingTimeForFTrain', async () => {
     const walkingTime = await locationProvider.getWalkingTimeToTransit('F');
-    expect(walkingTime).toBe(12); // F train at Carroll St is 12 minutes away - calculated dynamically
+    expect(walkingTime).toBe(12); // F train at Carroll St is 12 minutes away - calculated dynamically with Brooklyn 3.75 mph speed
   });
 
   test('shouldThrowErrorForUnsupportedLines', async () => {

@@ -4,6 +4,16 @@ import { CacheManager } from './CacheManager';
 
 export type DataSourceType = 'realtime' | 'estimate' | 'fixed';
 
+export interface RouteConfig {
+  direction: 'northbound' | 'southbound';
+  startStation: string;
+  endStation: string;
+  line: string;
+  getWalkingToStation: () => Promise<number>;
+  getWalkingFromStation: () => Promise<number>;
+  transitTime: number;
+}
+
 export interface RouteStep {
   type: 'walk' | 'wait' | 'transit';
   description: string;
@@ -75,40 +85,61 @@ export class RealMTAService {
     destination: string,
     targetArrival: string
   ): Promise<Route[]> {
+    const config: RouteConfig = {
+      direction: 'northbound',
+      startStation: 'Carroll St',
+      endStation: '23rd St',
+      line: 'F',
+      getWalkingToStation: () => this.locationProvider.getWalkingTimeToTransit('F'),
+      getWalkingFromStation: () => Promise.resolve(this.locationProvider.getWalkingTimeFromTwentyThirdSt()),
+      transitTime: 18
+    };
+
+    return this.calculateRoutesForDirection(config, targetArrival);
+  }
+
+  /**
+   * Unified route calculation method for any direction and configuration
+   */
+  private async calculateRoutesForDirection(
+    config: RouteConfig,
+    targetArrival: string
+  ): Promise<Route[]> {
     try {
-      console.log('[RealMTAService] Calculating F train routes from Carroll St to 23rd St');
+      console.log(`[RealMTAService] Calculating ${config.line} train routes from ${config.startStation} to ${config.endStation}`);
       
-      // Get walking time to Carroll St (fixed at 8 minutes)
-      const walkingToCarrollSt = await this.locationProvider.getWalkingTimeToTransit('F');
+      // Get walking times using config methods
+      const walkingToStation = await config.getWalkingToStation();
+      const walkingFromStation = await config.getWalkingFromStation();
       
-      // Get real-time F train data
-      const fTrainArrivals = await this.fetchFTrainArrivals();
+      // Get real-time train data for the specified direction
+      const trainArrivals = await this.fetchTrainArrivals(config.direction, config.startStation);
       
-      // Build routes for each upcoming F train
-      const routes = await this.buildFTrainRoutes(fTrainArrivals, walkingToCarrollSt, targetArrival);
+      // Build routes for each upcoming train
+      const routes = await this.buildRoutesForConfig(trainArrivals, config, walkingToStation, walkingFromStation, targetArrival);
       
-      // Sort by arrival time at 23rd St
+      // Sort by arrival time at destination
       routes.sort((a, b) => {
         const timeA = this.parseTime(a.arrivalTime);
         const timeB = this.parseTime(b.arrivalTime);
         return timeA.getTime() - timeB.getTime();
       });
       
-      console.log(`[RealMTAService] Generated ${routes.length} F train routes`);
+      console.log(`[RealMTAService] Generated ${routes.length} ${config.line} train routes`);
       return routes;
       
     } catch (error) {
-      console.error('[RealMTAService] Failed to calculate F train routes:', error);
-      throw new Error(`Unable to fetch F train data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(`[RealMTAService] Failed to calculate ${config.line} train routes:`, error);
+      throw new Error(`Unable to fetch ${config.line} train data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Fetch real-time F train arrivals at Carroll St
+   * Fetch real-time train arrivals for any direction and station
    */
-  private async fetchFTrainArrivals(): Promise<StopTimeUpdate[]> {
+  private async fetchTrainArrivals(direction: 'northbound' | 'southbound', station: string): Promise<StopTimeUpdate[]> {
     try {
-      console.log('[RealMTAService] Fetching F train GTFS-RT data...');
+      console.log(`[RealMTAService] Fetching ${direction} F train GTFS-RT data for ${station}...`);
       
       // Add cache-busting parameter
       const cacheBuster = Date.now();
@@ -138,17 +169,20 @@ export class RealMTAService {
       const arrivals: StopTimeUpdate[] = [];
       
       // Generate next 4 F train arrivals (every 6-8 minutes during peak)
+      // Use appropriate stop ID based on station
+      const stopId = station === 'Carroll St' ? this.CARROLL_ST_STOP_ID : this.TWENTY_THIRD_ST_STOP_ID;
+      
       for (let i = 0; i < 4; i++) {
         const departureTime = new Date(now.getTime() + (i * 7 + 2) * 60000); // 2, 9, 16, 23 minutes from now
         arrivals.push({
-          stopId: this.CARROLL_ST_STOP_ID,
+          stopId: stopId,
           stopSequence: 1,
           departureTime: Math.floor(departureTime.getTime() / 1000),
           arrivalTime: Math.floor(departureTime.getTime() / 1000)
         });
       }
       
-      console.log(`[RealMTAService] Found ${arrivals.length} upcoming F trains at Carroll St`);
+      console.log(`[RealMTAService] Found ${arrivals.length} upcoming F trains at ${station}`);
       return arrivals;
       
     } catch (error) {
@@ -158,73 +192,74 @@ export class RealMTAService {
   }
 
   /**
-   * Build route objects for each F train departure
+   * Build route objects for any train configuration
    */
-  private async buildFTrainRoutes(
-    fTrainArrivals: StopTimeUpdate[], 
-    walkingToCarrollSt: number,
+  private async buildRoutesForConfig(
+    trainArrivals: StopTimeUpdate[], 
+    config: RouteConfig,
+    walkingToStation: number,
+    walkingFromStation: number,
     targetArrival: string
   ): Promise<Route[]> {
     const routes: Route[] = [];
     const targetTime = this.parseTime(targetArrival);
     
-    for (let i = 0; i < fTrainArrivals.length; i++) {
-      const arrival = fTrainArrivals[i];
+    for (let i = 0; i < trainArrivals.length; i++) {
+      const arrival = trainArrivals[i];
       const departureTime = new Date(arrival.departureTime! * 1000);
       
-      // Calculate when user needs to leave home
-      const leaveHomeTime = new Date(departureTime.getTime() - walkingToCarrollSt * 60000);
+      // Calculate when user needs to leave origin
+      const leaveOriginTime = new Date(departureTime.getTime() - walkingToStation * 60000);
       
       // Skip if user needs to leave in the past
-      if (leaveHomeTime.getTime() < Date.now()) {
+      if (leaveOriginTime.getTime() < Date.now()) {
         continue;
       }
       
-      // F train travel time from Carroll St to 23rd St (approximately 18 minutes)
-      const fTrainTravelTime = 18;
-      const arrivalAt23rdSt = new Date(departureTime.getTime() + fTrainTravelTime * 60000);
+      // Train travel time using config
+      const trainTravelTime = config.transitTime;
+      const arrivalAtEndStation = new Date(departureTime.getTime() + trainTravelTime * 60000);
       
-      // Final walk time to destination (calculated dynamically)
-      const finalWalkTime = this.locationProvider.getWalkingTimeFromTwentyThirdSt();
-      const finalArrivalTime = new Date(arrivalAt23rdSt.getTime() + finalWalkTime * 60000);
+      // Final walk time to destination
+      const finalArrivalTime = new Date(arrivalAtEndStation.getTime() + walkingFromStation * 60000);
       
       // Total journey time
       const totalDuration = Math.round((finalArrivalTime.getTime() - Date.now()) / 60000);
       
-      // Wait time at Carroll St
-      const waitTime = Math.max(0, Math.round((departureTime.getTime() - Date.now() - walkingToCarrollSt * 60000) / 60000));
+      // Wait time at starting station
+      const waitTime = Math.max(0, Math.round((departureTime.getTime() - Date.now() - walkingToStation * 60000) / 60000));
       
       // Build route steps
       const steps: RouteStep[] = [
         {
           type: 'walk',
-          description: 'Walk to Carroll St station',
-          duration: walkingToCarrollSt,
+          description: `Walk to ${config.startStation} station`,
+          duration: walkingToStation,
           dataSource: 'fixed',
-          toStation: 'Carroll St'
+          toStation: config.startStation
         },
         {
           type: 'wait',
-          description: `Wait for northbound F train`,
+          description: `Wait for ${config.direction} ${config.line} train`,
           duration: waitTime,
           dataSource: 'realtime',
-          fromStation: 'Carroll St'
+          fromStation: config.startStation
         },
         {
           type: 'transit',
-          description: 'Take F train to 23rd St',
-          duration: fTrainTravelTime,
+          description: `Take ${config.line} train to ${config.endStation}`,
+          duration: trainTravelTime,
           dataSource: 'realtime',
-          line: 'F',
-          fromStation: 'Carroll St',
-          toStation: '23rd St'
+          line: config.line,
+          fromStation: config.startStation,
+          toStation: config.endStation
         },
         {
           type: 'walk',
           description: 'Walk to destination',
-          duration: finalWalkTime,
+          duration: walkingFromStation,
           dataSource: 'fixed',
-          fromStation: '23rd St'
+          fromStation: config.endStation
         }
       ];
       
@@ -232,19 +267,19 @@ export class RealMTAService {
         id: i + 1,
         arrivalTime: this.formatTime(finalArrivalTime),
         duration: `${totalDuration} min`,
-        method: 'F train + Walk',
-        details: `Take F train from Carroll St to 23rd St, then walk to destination`,
+        method: `${config.line} train + Walk`,
+        details: `Take ${config.line} train from ${config.startStation} to ${config.endStation}, then walk to destination`,
         transfers: 0,
         walkingDistance: '0.4 mi',
-        walkingToTransit: walkingToCarrollSt,
+        walkingToTransit: walkingToStation,
         isRealTimeData: true,
         confidence: 'high',
-        startingStation: 'Carroll St',
-        endingStation: '23rd St',
+        startingStation: config.startStation,
+        endingStation: config.endStation,
         waitTime: waitTime,
         nextTrainDeparture: this.formatTime(departureTime),
-        finalWalkingTime: finalWalkTime,
-        transitTime: fTrainTravelTime,
+        finalWalkingTime: walkingFromStation,
+        transitTime: trainTravelTime,
         steps: steps
       };
       
@@ -296,148 +331,19 @@ export class RealMTAService {
     destination: string,
     targetArrival: string
   ): Promise<Route[]> {
-    try {
-      console.log('[RealMTAService] Calculating afternoon F train routes from 23rd St to Carroll St');
-      
-      // Get walking time from work to 23rd St station
-      const walkingToTwentyThirdSt = await this.locationProvider.getWalkingTimeFromWorkToTwentyThirdSt();
-      
-      // Get walking time from Carroll St to home
-      const walkingFromCarrollSt = await this.locationProvider.getWalkingTimeFromCarrollStToHome();
-      
-      // Get real-time southbound F train data (from 23rd St to Carroll St)
-      const fTrainArrivals = await this.fetchSouthboundFTrainArrivals();
-      
-      // Build afternoon routes for each upcoming F train
-      const routes = await this.buildAfternoonFTrainRoutes(
-        fTrainArrivals, 
-        walkingToTwentyThirdSt, 
-        walkingFromCarrollSt,
-        targetArrival
-      );
-      
-      // Sort by arrival time at home
-      routes.sort((a, b) => {
-        const timeA = this.parseTime(a.arrivalTime);
-        const timeB = this.parseTime(b.arrivalTime);
-        return timeA.getTime() - timeB.getTime();
-      });
-      
-      console.log(`[RealMTAService] Generated ${routes.length} afternoon F train routes`);
-      return routes;
-      
-    } catch (error) {
-      console.error('[RealMTAService] Failed to calculate afternoon routes:', error);
-      throw new Error('Unable to calculate afternoon routes');
-    }
+    const config: RouteConfig = {
+      direction: 'southbound',
+      startStation: '23rd St',
+      endStation: 'Carroll St',
+      line: 'F',
+      getWalkingToStation: () => this.locationProvider.getWalkingTimeFromWorkToTwentyThirdSt(),
+      getWalkingFromStation: () => this.locationProvider.getWalkingTimeFromCarrollStToHome(),
+      transitTime: 18
+    };
+
+    return this.calculateRoutesForDirection(config, targetArrival);
   }
 
-  /**
-   * Fetch southbound F train arrivals at 23rd St station
-   */
-  private async fetchSouthboundFTrainArrivals(): Promise<any[]> {
-    try {
-      console.log('[RealMTAService] Fetching southbound F train GTFS-RT data...');
-      
-      // For now, return simulated arrivals - in real implementation this would
-      // parse GTFS-RT protobuf data filtering for southbound trains at 23rd St
-      return [
-        { departureTime: Date.now() + (5 * 60 * 1000) }, // 5 mins from now
-        { departureTime: Date.now() + (12 * 60 * 1000) }, // 12 mins from now
-        { departureTime: Date.now() + (20 * 60 * 1000) }, // 20 mins from now
-        { departureTime: Date.now() + (28 * 60 * 1000) }  // 28 mins from now
-      ];
-      
-    } catch (error) {
-      console.error('[RealMTAService] Failed to fetch southbound F train data:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Build afternoon route objects from F train arrival data
-   */
-  private async buildAfternoonFTrainRoutes(
-    fTrainArrivals: any[],
-    walkingToTwentyThirdSt: number,
-    walkingFromCarrollSt: number,
-    targetArrival: string
-  ): Promise<Route[]> {
-    const routes: Route[] = [];
-    let routeId = 1;
-    
-    for (const arrival of fTrainArrivals) {
-      const departureTime = new Date(arrival.departureTime);
-      const departureTimeStr = this.formatTime(departureTime);
-      
-      // F train travel time from 23rd St to Carroll St (reverse of morning: ~18 minutes)
-      const transitTime = 18;
-      const arrivalAtCarrollSt = new Date(departureTime.getTime() + (transitTime * 60 * 1000));
-      
-      // Final arrival at home after walking from Carroll St
-      const arrivalAtHome = new Date(arrivalAtCarrollSt.getTime() + (walkingFromCarrollSt * 60 * 1000));
-      const arrivalTimeStr = this.formatTime(arrivalAtHome);
-      
-      // Calculate when to leave work
-      const leaveWorkTime = new Date(departureTime.getTime() - (walkingToTwentyThirdSt * 60 * 1000));
-      const totalDuration = Math.round((arrivalAtHome.getTime() - leaveWorkTime.getTime()) / (60 * 1000));
-      
-      // Calculate wait time at 23rd St (how long until next train)
-      const waitTime = Math.max(0, Math.round((departureTime.getTime() - Date.now()) / (60 * 1000)));
-      
-      const route: Route = {
-        id: routeId++,
-        arrivalTime: arrivalTimeStr,
-        duration: `${totalDuration} min`,
-        method: 'F train + Walk',
-        details: 'Walk to 23rd St, take F train to Carroll St, then walk home',
-        transfers: 0,
-        walkingDistance: '0.4 mi', // Approximate total walking distance
-        walkingToTransit: walkingToTwentyThirdSt,
-        isRealTimeData: true,
-        confidence: 'high' as const,
-        startingStation: '23rd St',
-        endingStation: 'Carroll St',
-        waitTime: waitTime,
-        nextTrainDeparture: departureTimeStr,
-        finalWalkingTime: walkingFromCarrollSt,
-        transitTime: transitTime,
-        steps: [
-          {
-            type: 'walk',
-            description: 'Walk to 23rd St station',
-            duration: walkingToTwentyThirdSt,
-            dataSource: 'fixed'
-          },
-          {
-            type: 'wait',
-            description: 'Wait for F train',
-            duration: waitTime,
-            dataSource: 'realtime'
-          },
-          {
-            type: 'transit',
-            description: 'Take F train to Carroll St',
-            duration: transitTime,
-            dataSource: 'realtime',
-            line: 'F',
-            fromStation: '23rd St',
-            toStation: 'Carroll St'
-          },
-          {
-            type: 'walk',
-            description: 'Walk home from Carroll St',
-            duration: walkingFromCarrollSt,
-            dataSource: 'fixed'
-          }
-        ]
-      };
-      
-      routes.push(route);
-    }
-    
-    return routes;
-  }
 
   /**
    * Clear all caches

@@ -53,7 +53,7 @@ describe('MTAService', () => {
     expect(b61Route).toBeDefined();
     expect(b61Route!.walkingToTransit).toBe(2);
     
-    // Find F train route (13-minute walk to Carroll St - calculated dynamically)
+    // Find F train route (12-minute walk to Carroll St - calculated dynamically with Brooklyn 3.75 mph speed)
     const fRoute = routes.find(route => route.details.includes('F train'));
     expect(fRoute).toBeDefined();
     expect(fRoute!.walkingToTransit).toBe(12);
