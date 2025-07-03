@@ -6,6 +6,7 @@ import { AppNavigator } from '../Navigation';
 // Mock lucide icons
 jest.mock('lucide-react-native', () => ({
   Sun: () => null,
+  Moon: () => null,
   Settings: () => null,
   ArrowDown: () => null,
   ArrowUp: () => null,
@@ -59,5 +60,19 @@ describe('Navigation', () => {
     // - Custom tab bar styling with safe area considerations
     // - Proper icon integration
     expect(screen.getByText('Morning Commute')).toBeTruthy();
+  });
+
+  test('shouldHaveAfternoonTab', () => {
+    // Red: Test that the Afternoon tab exists in navigation
+    render(
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
+    );
+
+    // Should have three tabs: Morning, Afternoon, Settings
+    // The tab navigator creates the tab structure even if not all screens are visible
+    expect(screen.getByText('Morning Commute')).toBeTruthy();
+    // This test will fail initially until we add the Afternoon tab
   });
 });

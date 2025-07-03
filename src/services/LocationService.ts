@@ -45,6 +45,8 @@ export interface LocationProvider {
   getWalkingTime(origin: Location, destination: TransitStop): Promise<number>;
   getWalkingTimeToTransit(transitLine: string): Promise<number>;
   getWalkingTimeFromTwentyThirdSt(): number;
+  getWalkingTimeFromWorkToTwentyThirdSt(): Promise<number>;
+  getWalkingTimeFromCarrollStToHome(): Promise<number>;
 }
 
 export class StaticLocationProvider implements LocationProvider {
@@ -160,6 +162,18 @@ export class StaticLocationProvider implements LocationProvider {
   getTwentyThirdStLocation(): Location {
     return this.twentyThirdStLocation;
   }
+
+  // Get walking time from work to 23rd St station (reverse of morning commute)
+  async getWalkingTimeFromWorkToTwentyThirdSt(): Promise<number> {
+    const distance = calculateDistance(this.workLocation, this.twentyThirdStLocation);
+    return calculateWalkingTime(distance, true);
+  }
+
+  // Get walking time from Carroll St station to home (reverse of morning commute)
+  async getWalkingTimeFromCarrollStToHome(): Promise<number> {
+    // This should be the same as the morning commute walking time to Carroll St
+    return await this.getWalkingTimeToTransit('F');
+  }
 }
 
 // Future GPS implementation placeholder
@@ -195,5 +209,15 @@ export class GPSLocationProvider implements LocationProvider {
   getWalkingTimeFromTwentyThirdSt(): number {
     // TODO: Implement with GPS-based calculation
     throw new Error('GPS walking time from 23rd St calculation not implemented yet');
+  }
+
+  async getWalkingTimeFromWorkToTwentyThirdSt(): Promise<number> {
+    // TODO: Implement with GPS-based calculation
+    throw new Error('GPS walking time from work to 23rd St calculation not implemented yet');
+  }
+
+  async getWalkingTimeFromCarrollStToHome(): Promise<number> {
+    // TODO: Implement with GPS-based calculation
+    throw new Error('GPS walking time from Carroll St to home calculation not implemented yet');
   }
 }

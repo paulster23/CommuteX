@@ -1,7 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Sun, Settings } from 'lucide-react-native';
+import { Sun, Moon, Settings } from 'lucide-react-native';
 import { HomeScreen } from '../screens/HomeScreen';
+import { AfternoonScreen } from '../screens/AfternoonScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
@@ -15,6 +16,8 @@ export function AppNavigator() {
 
           if (route.name === 'Morning') {
             IconComponent = Sun;
+          } else if (route.name === 'Afternoon') {
+            IconComponent = Moon;
           } else if (route.name === 'Settings') {
             IconComponent = Settings;
           }
@@ -43,6 +46,11 @@ export function AppNavigator() {
         name="Morning" 
         component={HomeScreen}
         options={{ tabBarLabel: 'Morning' }}
+      />
+      <Tab.Screen 
+        name="Afternoon" 
+        component={AfternoonScreen}
+        options={{ tabBarLabel: 'Afternoon' }}
       />
       <Tab.Screen 
         name="Settings" 
