@@ -20,7 +20,7 @@ export interface GTFSData {
 
 export class MTAService {
   private readonly MTA_API_KEY = process.env.MTA_API_KEY || 'demo-key';
-  private readonly GTFS_REALTIME_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs';
+  private readonly GTFS_REALTIME_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm';
   private readonly locationProvider: LocationProvider;
 
   constructor(locationProvider?: LocationProvider) {
@@ -30,14 +30,14 @@ export class MTAService {
   async fetchRealTimeData(): Promise<GTFSData> {
     try {
       // In a real implementation, this would fetch from MTA GTFS-RT API
-      // For now, we'll simulate real-time data with realistic NYC transit routes
+      // For now, we'll simulate real-time data with F train only
       const routes = await this.generateRealisticRoutes();
       
       return {
         routes,
         lastUpdated: new Date(),
         serviceAlerts: [
-          'R train: Minor delays due to signal problems',
+          'F train: Normal service',
           'B61 bus: Normal service'
         ]
       };
@@ -53,7 +53,7 @@ export class MTAService {
     destination: string,
     targetArrival: string
   ): Promise<Route[]> {
-    // Simulate NYC Subway Challenge algorithm
+    // Simplified algorithm for F train only
     const routes = await this.runTransitAlgorithm(origin, destination, targetArrival);
     
     // Sort by arrival time (best routes first)
@@ -69,37 +69,21 @@ export class MTAService {
     destination: string,
     targetArrival: string
   ): Promise<Route[]> {
-    // Simulate advanced routing algorithm similar to NYCSubwayChallenge
+    // Simplified routing algorithm for F train + B61 bus only
     const currentTime = new Date();
     const targetTime = this.parseTime(targetArrival);
     
-    // Calculate multiple route options using different transit combinations
+    // Calculate route options using only supported transit
     const routes: Route[] = [];
     
     // Get walking times to each transit option
-    const rTrainWalk = await this.locationProvider.getWalkingTimeToTransit('R');
     const b61Walk = await this.locationProvider.getWalkingTimeToTransit('B61');
     const fTrainWalk = await this.locationProvider.getWalkingTimeToTransit('F');
-    const fourTrainWalk = await this.locationProvider.getWalkingTimeToTransit('4');
     
-    // Route 1: R train + Walk
-    const rTotalTime = rTrainWalk + 35; // walking to transit + transit time
-    routes.push({
-      id: 1,
-      arrivalTime: this.calculateArrivalTime(currentTime, rTotalTime, -5),
-      duration: `${rTotalTime} min`,
-      method: 'Subway + Walk',
-      details: `Walk ${rTrainWalk} min to R train, R train to Union Sq-14 St, walk 8 min to destination`,
-      transfers: 0,
-      walkingDistance: '0.4 mi',
-      walkingToTransit: rTrainWalk,
-      realTimeDelay: this.getRandomDelay()
-    });
-
-    // Route 2: B61 bus + Walk
+    // Route 1: B61 bus + Walk
     const b61TotalTime = b61Walk + 42; // walking to transit + transit time
     routes.push({
-      id: 2,
+      id: 1,
       arrivalTime: this.calculateArrivalTime(currentTime, b61TotalTime, 2),
       duration: `${b61TotalTime} min`,
       method: 'Bus + Walk',
@@ -110,31 +94,17 @@ export class MTAService {
       realTimeDelay: this.getRandomDelay()
     });
 
-    // Route 3: F train + L train (with transfer)
-    const fTotalTime = fTrainWalk + 38; // walking to transit + transit time
+    // Route 2: F train direct
+    const fTotalTime = fTrainWalk + 34; // walking to transit + F train to 23rd St + final walk
     routes.push({
-      id: 3,
+      id: 2,
       arrivalTime: this.calculateArrivalTime(currentTime, fTotalTime, -2),
       duration: `${fTotalTime} min`,
-      method: 'Subway + Transfer',
-      details: `Walk ${fTrainWalk} min to F train, F train to 14 St-Union Sq, transfer to L train to 14 St-6 Ave, walk 5 min`,
-      transfers: 1,
-      walkingDistance: '0.3 mi',
+      method: 'F train + Walk',
+      details: `Walk ${fTrainWalk} min to F train, F train to 23rd St, walk 8 min to destination`,
+      transfers: 0,
+      walkingDistance: '0.4 mi',
       walkingToTransit: fTrainWalk,
-      realTimeDelay: this.getRandomDelay()
-    });
-
-    // Route 4: Express option (4/5/6 + L)
-    const fourTotalTime = fourTrainWalk + 33; // walking to transit + transit time
-    routes.push({
-      id: 4,
-      arrivalTime: this.calculateArrivalTime(currentTime, fourTotalTime, -7),
-      duration: `${fourTotalTime} min`,
-      method: 'Express + Local',
-      details: `Walk ${fourTrainWalk} min to 4 train, 4 train to Union Sq-14 St, transfer to L train to 6 Ave, walk 4 min`,
-      transfers: 1,
-      walkingDistance: '0.2 mi',
-      walkingToTransit: fourTrainWalk,
       realTimeDelay: this.getRandomDelay()
     });
 
@@ -195,7 +165,7 @@ export class MTAService {
   }
 
   private addServiceAlerts(details: string, method: string): string {
-    if (method.includes('R train') && Math.random() > 0.7) {
+    if (method.includes('F train') && Math.random() > 0.8) {
       return `${details} • Service alert: Minor delays`;
     }
     return details;
@@ -207,16 +177,16 @@ export class MTAService {
         {
           id: 1,
           arrivalTime: '8:55 AM',
-          duration: '35 min',
-          method: 'Subway + Walk',
-          details: 'R train to Union Sq, then walk (Offline data)',
+          duration: '42 min',
+          method: 'F train + Walk',
+          details: 'F train to 23rd St, then walk (Offline data)',
           transfers: 0,
           walkingDistance: '0.4 mi'
         },
         {
           id: 2,
           arrivalTime: '9:02 AM',
-          duration: '42 min',
+          duration: '47 min',
           method: 'Bus + Walk',
           details: 'B61 to Atlantic Ave, then walk (Offline data)',
           transfers: 0,

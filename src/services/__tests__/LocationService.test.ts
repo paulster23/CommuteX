@@ -21,7 +21,7 @@ describe('LocationService', () => {
     );
     
     const walkingTime = await locationProvider.getWalkingTime(origin, fTrainStop!);
-    expect(walkingTime).toBe(15); // 15 minutes to F train
+    expect(walkingTime).toBe(12); // 12 minutes to F train (Carroll St) - calculated dynamically with 25% speed boost
   });
 
   test('shouldCalculateWalkingTimeToB61Bus', async () => {
@@ -31,32 +31,18 @@ describe('LocationService', () => {
     );
     
     const walkingTime = await locationProvider.getWalkingTime(origin, b61Stop!);
-    expect(walkingTime).toBe(5); // 5 minutes to B61 bus
+    expect(walkingTime).toBe(2); // 2 minutes to B61 bus - calculated dynamically
   });
 
-  test('shouldCalculateWalkingTimeToRTrain', async () => {
-    const origin = await locationProvider.getCurrentLocation();
-    const rTrainStop = locationProvider.getTransitStops().find(
-      stop => stop.lines.includes('R')
-    );
-    
-    const walkingTime = await locationProvider.getWalkingTime(origin, rTrainStop!);
-    expect(walkingTime).toBe(30); // 30 minutes to R train
-  });
-
-  test('shouldReturnShortestWalkingTimeForMultipleStops', async () => {
+  test('shouldReturnShortestWalkingTimeForFTrain', async () => {
     const walkingTime = await locationProvider.getWalkingTimeToTransit('F');
-    expect(walkingTime).toBe(15); // F train is 15 minutes away
+    expect(walkingTime).toBe(12); // F train at Carroll St is 12 minutes away - calculated dynamically
   });
 
-  test('shouldHandleMultipleLineAccess', async () => {
-    // Atlantic-Barclays serves multiple lines, should return same time for all
-    const rTime = await locationProvider.getWalkingTimeToTransit('R');
-    const nTime = await locationProvider.getWalkingTimeToTransit('N');
-    const qTime = await locationProvider.getWalkingTimeToTransit('Q');
-    
-    expect(rTime).toBe(30);
-    expect(nTime).toBe(30);
-    expect(qTime).toBe(30);
+  test('shouldThrowErrorForUnsupportedLines', async () => {
+    // Since we only support F train now, other lines should throw errors
+    await expect(locationProvider.getWalkingTimeToTransit('R')).rejects.toThrow('No transit stops found for line: R');
+    await expect(locationProvider.getWalkingTimeToTransit('N')).rejects.toThrow('No transit stops found for line: N');
+    await expect(locationProvider.getWalkingTimeToTransit('Q')).rejects.toThrow('No transit stops found for line: Q');
   });
 });

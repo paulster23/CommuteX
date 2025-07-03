@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Animated, use
 import { ArrowDown, ArrowUp, Zap } from 'lucide-react-native';
 import { RealMTAService, Route, DataSourceType } from '../services/RealMTAService';
 import { TransferRouteIcon } from './TransferRouteIcon';
-import { TrainDeparturePills } from './TrainDeparturePills';
 import { getThemeStyles } from '../design/components';
 import { colors } from '../design/theme';
 
@@ -442,6 +441,56 @@ export function CommuteApp() {
     setExpandedRoutes(newExpanded);
   };
 
+  const clearAllCaches = async () => {
+    try {
+      console.log('[DEBUG] Clearing all caches...');
+      
+      // Clear service worker caches
+      if ('serviceWorker' in navigator && 'caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map(cacheName => {
+            console.log('[DEBUG] Deleting cache:', cacheName);
+            return caches.delete(cacheName);
+          })
+        );
+        
+        // Unregister and re-register service worker
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(
+          registrations.map(registration => {
+            console.log('[DEBUG] Unregistering service worker');
+            return registration.unregister();
+          })
+        );
+      }
+      
+      // Clear application cache
+      if (mtaService && typeof mtaService.clearAllCaches === 'function') {
+        mtaService.clearAllCaches();
+        console.log('[DEBUG] Cleared MTA service caches');
+      }
+      
+      // Clear localStorage and sessionStorage
+      if (typeof Storage !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+        console.log('[DEBUG] Cleared browser storage');
+      }
+      
+      // Force reload routes with cache busting
+      console.log('[DEBUG] Reloading routes with fresh data...');
+      setLoading(true);
+      await loadRoutes();
+      
+      alert('All caches cleared successfully! Route improvements should now be visible.');
+      
+    } catch (error) {
+      console.error('[DEBUG] Failed to clear caches:', error);
+      alert('Failed to clear some caches. Try refreshing the page manually.');
+    }
+  };
+
   return (
     <View 
       testID="app-container"
@@ -466,6 +515,25 @@ export function CommuteApp() {
             {COMMUTE_DATA.home.split(',')[0]} → {COMMUTE_DATA.work.split(',')[0]}
           </Text>
         </View>
+        
+        {/* Debug: Cache Clear Button */}
+        <TouchableOpacity 
+          style={{
+            position: 'absolute',
+            right: 20,
+            top: 20,
+            backgroundColor: '#FF3B30',
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 8,
+            zIndex: 1000
+          }}
+          onPress={clearAllCaches}
+        >
+          <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>
+            Clear Cache
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -484,13 +552,6 @@ export function CommuteApp() {
           />
         }
       >
-        {/* Train Departure Pills */}
-        {routes.length > 0 && routes[0].nextDepartures && (
-          <TrainDeparturePills 
-            departures={routes[0].nextDepartures} 
-            stationName={routes[0].startingStation || 'Station'} 
-          />
-        )}
 
         {/* Routes */}
         {loading ? (

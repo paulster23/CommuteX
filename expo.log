@@ -1,0 +1,41 @@
+
+> commutex@1.0.0 start
+> expo start --clear
+
+Starting project at /Users/paul/Documents/GitHub/CommuteX/CommuteX
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+The following packages should be updated for best compatibility with the installed expo version:
+  @react-native-async-storage/async-storage@2.2.0 - expected version: 2.1.2
+  expo@53.0.13 - expected version: 53.0.16
+  expo-location@18.1.5 - expected version: ~18.1.6
+  react-native@0.79.4 - expected version: 0.79.5
+  react-native-gesture-handler@2.26.0 - expected version: ~2.24.0
+  react-native-reanimated@3.18.0 - expected version: ~3.17.4
+  react-native-safe-area-context@5.5.0 - expected version: 5.4.0
+  babel-preset-expo@13.2.1 - expected version: ~13.0.0
+  jest@30.0.3 - expected version: ~29.7.0
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Recrawled this watch 5 times, most recently because:
+MustScanSubDirs UserDroppedTo resolve, please review the information on
+https://facebook.github.io/watchman/docs/troubleshooting.html#recrawl
+To clear this warning, run:
+`watchman watch-del '/Users/paul/Documents/GitHub/CommuteX/CommuteX' ; watchman watch-project '/Users/paul/Documents/GitHub/CommuteX/CommuteX'`
+
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94.7% ( 631/2102)
+Web Bundled 4739ms index.ts (2142 modules)
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 55ms index.ts (1 module)
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 72ms index.ts (1 module)
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 47ms index.ts (1 module)
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 74ms index.ts (1 module)
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 81ms index.ts (1 module)
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 44ms index.ts (1 module)

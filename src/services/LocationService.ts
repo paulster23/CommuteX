@@ -3,6 +3,34 @@ export interface Location {
   lng: number;
 }
 
+// Utility function to calculate distance between two coordinates using Haversine formula
+function calculateDistance(point1: Location, point2: Location): number {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (point2.lat - point1.lat) * Math.PI / 180;
+  const dLon = (point2.lng - point1.lng) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c; // Distance in miles
+  return distance;
+}
+
+// Calculate walking time with 25% speed increase (3.75 mph) and buffer time
+function calculateWalkingTime(distanceMiles: number, addBuffer: boolean = true): number {
+  const WALKING_SPEED_MPH = 3.75; // 25% faster than standard 3 mph
+  const baseTimeMinutes = (distanceMiles / WALKING_SPEED_MPH) * 60;
+  
+  // Add buffer time for realistic conditions
+  let bufferMinutes = 0;
+  if (addBuffer) {
+    bufferMinutes += 1; // Buffer for intersections and realistic conditions
+  }
+  
+  return Math.round(baseTimeMinutes + bufferMinutes);
+}
+
 export interface TransitStop {
   id: string;
   name: string;
@@ -16,6 +44,7 @@ export interface LocationProvider {
   getCurrentLocation(): Promise<Location>;
   getWalkingTime(origin: Location, destination: TransitStop): Promise<number>;
   getWalkingTimeToTransit(transitLine: string): Promise<number>;
+  getWalkingTimeFromTwentyThirdSt(): number;
 }
 
 export class StaticLocationProvider implements LocationProvider {
@@ -24,30 +53,36 @@ export class StaticLocationProvider implements LocationProvider {
     lng: -73.990982
   };
 
+  // Work destination coordinates (512 W 22nd St, Manhattan)
+  private readonly workLocation: Location = {
+    lat: 40.746021,
+    lng: -73.996736
+  };
+
+  // 23rd St station coordinates (F train at 6th Ave)
+  private readonly twentyThirdStLocation: Location = {
+    lat: 40.742878,
+    lng: -73.992821
+  };
+
   private readonly transitStops: TransitStop[] = [
+    // F train starting station (dynamic walking time calculation)
     {
-      id: "f-4av-9st",
-      name: "4 Av-9 St (F/G)",
-      lines: ["F", "G"],
-      walkingTimeMinutes: 12,
-      walkingDistanceMiles: 0.7,
-      coordinates: { lat: 40.670272, lng: -73.988593 }
+      id: "f-carroll-st",
+      name: "Carroll St",
+      lines: ["F"],
+      walkingTimeMinutes: 0, // Will be calculated dynamically
+      walkingDistanceMiles: 0, // Will be calculated dynamically
+      coordinates: { lat: 40.679371, lng: -73.995458 }
     },
+    // Bus route (keeping for completeness)
     {
       id: "b61-court-atlantic",
       name: "Court St/Atlantic Av",
       lines: ["B61"],
-      walkingTimeMinutes: 5,
-      walkingDistanceMiles: 0.3,
+      walkingTimeMinutes: 0, // Will be calculated dynamically
+      walkingDistanceMiles: 0, // Will be calculated dynamically
       coordinates: { lat: 40.688873, lng: -73.990982 }
-    },
-    {
-      id: "atlantic-barclays",
-      name: "Atlantic Av-Barclays Ctr",
-      lines: ["N", "Q", "R", "W", "B", "D", "2", "3", "4", "5"],
-      walkingTimeMinutes: 30,
-      walkingDistanceMiles: 1.2,
-      coordinates: { lat: 40.684359, lng: -73.977666 }
     }
   ];
 
@@ -56,8 +91,9 @@ export class StaticLocationProvider implements LocationProvider {
   }
 
   async getWalkingTime(origin: Location, destination: TransitStop): Promise<number> {
-    // For static provider, we ignore the origin and use pre-calculated times
-    return destination.walkingTimeMinutes;
+    // Calculate real distance and walking time with 20% speed boost
+    const distance = calculateDistance(origin, destination.coordinates);
+    return calculateWalkingTime(distance, true);
   }
 
   async getWalkingTimeToTransit(transitLine: string): Promise<number> {
@@ -70,8 +106,12 @@ export class StaticLocationProvider implements LocationProvider {
       throw new Error(`No transit stops found for line: ${transitLine}`);
     }
 
-    // Return the shortest walking time to any stop serving this line
-    return Math.min(...availableStops.map(stop => stop.walkingTimeMinutes));
+    // Calculate walking time to each stop and return the shortest
+    const walkingTimes = await Promise.all(
+      availableStops.map(stop => this.getWalkingTime(this.homeLocation, stop))
+    );
+
+    return Math.min(...walkingTimes);
   }
 
   getTransitStops(): TransitStop[] {
@@ -87,10 +127,38 @@ export class StaticLocationProvider implements LocationProvider {
       return null;
     }
 
-    // Return the stop with shortest walking time
-    return availableStops.reduce((closest, current) => 
-      current.walkingTimeMinutes < closest.walkingTimeMinutes ? current : closest
+    // Return the stop with shortest walking time (calculate dynamically)
+    let closestStop = availableStops[0];
+    let shortestTime = calculateWalkingTime(
+      calculateDistance(this.homeLocation, closestStop.coordinates)
     );
+
+    for (const stop of availableStops.slice(1)) {
+      const walkingTime = calculateWalkingTime(
+        calculateDistance(this.homeLocation, stop.coordinates)
+      );
+      if (walkingTime < shortestTime) {
+        shortestTime = walkingTime;
+        closestStop = stop;
+      }
+    }
+
+    return closestStop;
+  }
+
+  // Get walking time from 23rd St station to work destination
+  getWalkingTimeFromTwentyThirdSt(): number {
+    const distance = calculateDistance(this.twentyThirdStLocation, this.workLocation);
+    return calculateWalkingTime(distance, true);
+  }
+
+  // Get coordinates for specific locations
+  getWorkLocation(): Location {
+    return this.workLocation;
+  }
+
+  getTwentyThirdStLocation(): Location {
+    return this.twentyThirdStLocation;
   }
 }
 
@@ -122,5 +190,10 @@ export class GPSLocationProvider implements LocationProvider {
   async getWalkingTimeToTransit(transitLine: string): Promise<number> {
     // TODO: Implement with real-time API calls
     throw new Error('GPS transit walking time calculation not implemented yet');
+  }
+
+  getWalkingTimeFromTwentyThirdSt(): number {
+    // TODO: Implement with GPS-based calculation
+    throw new Error('GPS walking time from 23rd St calculation not implemented yet');
   }
 }

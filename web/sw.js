@@ -1,4 +1,4 @@
-const CACHE_NAME = 'commutex-v2-standalone';
+const CACHE_NAME = 'commutex-v3-route-improvements';
 const urlsToCache = [
   '/',
   '/index.html',

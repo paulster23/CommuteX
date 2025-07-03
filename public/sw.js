@@ -5,7 +5,7 @@
  * Following CLAUDE.md principles for clean, focused implementation
  */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2-route-improvements';
 const CACHE_NAME = `commutex-${CACHE_VERSION}`;
 const OFFLINE_CACHE = `commutex-offline-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `commutex-runtime-${CACHE_VERSION}`;

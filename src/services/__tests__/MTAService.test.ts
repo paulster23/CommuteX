@@ -48,19 +48,14 @@ describe('MTAService', () => {
       '9:00 AM'
     );
     
-    // Find B61 route (should be fastest due to 5-minute walk)
+    // Find B61 route (should be fastest due to 2-minute walk - calculated dynamically)
     const b61Route = routes.find(route => route.method.includes('Bus'));
     expect(b61Route).toBeDefined();
-    expect(b61Route!.walkingToTransit).toBe(5);
+    expect(b61Route!.walkingToTransit).toBe(2);
     
-    // Find F train route (15-minute walk)
+    // Find F train route (13-minute walk to Carroll St - calculated dynamically)
     const fRoute = routes.find(route => route.details.includes('F train'));
     expect(fRoute).toBeDefined();
-    expect(fRoute!.walkingToTransit).toBe(15);
-    
-    // Find R train route (30-minute walk)
-    const rRoute = routes.find(route => route.details.includes('R train'));
-    expect(rRoute).toBeDefined();
-    expect(rRoute!.walkingToTransit).toBe(30);
+    expect(fRoute!.walkingToTransit).toBe(12);
   });
 });
