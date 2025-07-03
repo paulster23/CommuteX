@@ -1,9 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, Route, Activity, Settings } from 'lucide-react-native';
+import { Sun, Settings } from 'lucide-react-native';
 import { HomeScreen } from '../screens/HomeScreen';
-import { RoutesScreen } from '../screens/RoutesScreen';
-import { LiveUpdatesScreen } from '../screens/LiveUpdatesScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
@@ -15,12 +13,8 @@ export function AppNavigator() {
         tabBarIcon: ({ focused, color, size }) => {
           let IconComponent;
 
-          if (route.name === 'Home') {
-            IconComponent = Home;
-          } else if (route.name === 'Routes') {
-            IconComponent = Route;
-          } else if (route.name === 'Live') {
-            IconComponent = Activity;
+          if (route.name === 'Morning') {
+            IconComponent = Sun;
           } else if (route.name === 'Settings') {
             IconComponent = Settings;
           }
@@ -31,9 +25,9 @@ export function AppNavigator() {
         tabBarInactiveTintColor: '#8E8E93',
         headerShown: false, // PWA optimization - use screen space efficiently
         tabBarStyle: {
-          paddingBottom: 8, // PWA safe area optimization
+          paddingBottom: 16, // Increased padding to prevent text cutoff
           paddingTop: 8,
-          height: 64,
+          height: 80, // Increased height to accommodate text labels
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E5E5E7',
@@ -46,19 +40,9 @@ export function AppNavigator() {
       })}
     >
       <Tab.Screen 
-        name="Home" 
+        name="Morning" 
         component={HomeScreen}
-        options={{ tabBarLabel: 'Home' }}
-      />
-      <Tab.Screen 
-        name="Routes" 
-        component={RoutesScreen}
-        options={{ tabBarLabel: 'Routes' }}
-      />
-      <Tab.Screen 
-        name="Live" 
-        component={LiveUpdatesScreen}
-        options={{ tabBarLabel: 'Live' }}
+        options={{ tabBarLabel: 'Morning' }}
       />
       <Tab.Screen 
         name="Settings" 

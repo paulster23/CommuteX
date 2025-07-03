@@ -5,9 +5,7 @@ import { AppNavigator } from '../Navigation';
 
 // Mock lucide icons
 jest.mock('lucide-react-native', () => ({
-  Home: () => null,
-  Route: () => null,
-  Activity: () => null,
+  Sun: () => null,
   Settings: () => null,
   ArrowDown: () => null,
   ArrowUp: () => null,
@@ -28,7 +26,7 @@ describe('Navigation', () => {
       </NavigationContainer>
     );
 
-    // Should render the Home screen with CommuteApp content by default
+    // Should render the Morning screen with CommuteApp content by default
     expect(screen.getByText('Morning Commute')).toBeTruthy();
   });
 
@@ -40,7 +38,7 @@ describe('Navigation', () => {
       </NavigationContainer>
     );
 
-    // Should have the Home screen with CommuteApp visible by default
+    // Should have the Morning screen with CommuteApp visible by default
     expect(screen.getByText('Morning Commute')).toBeTruthy();
     
     // Tab structure should be rendered (exact implementation may vary by platform)
