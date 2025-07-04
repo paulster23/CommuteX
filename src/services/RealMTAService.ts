@@ -139,8 +139,11 @@ export class RealMTAService {
         return timeA.getTime() - timeB.getTime();
       });
       
-      console.log(`[RealMTAService] Generated ${allRoutes.length} total routes (${directRoutes.length} direct, ${transferRoutes.length} transfer)`);
-      return allRoutes;
+      // Limit to 5 routes
+      const limitedRoutes = allRoutes.slice(0, 5);
+      
+      console.log(`[RealMTAService] Generated ${limitedRoutes.length} total routes (from ${directRoutes.length} direct, ${transferRoutes.length} transfer)`);
+      return limitedRoutes;
       
     } catch (error) {
       console.error('[RealMTAService] Failed to calculate all routes:', error);
@@ -246,8 +249,8 @@ export class RealMTAService {
       const now = new Date();
       const arrivals: StopTimeUpdate[] = [];
       
-      // Generate next 4 train arrivals (every 6-8 minutes during peak)
-      for (let i = 0; i < 4; i++) {
+      // Generate next 6 train arrivals (every 6-8 minutes during peak)
+      for (let i = 0; i < 6; i++) {
         const departureTime = new Date(now.getTime() + (i * 7 + 2) * 60000); // 2, 9, 16, 23 minutes from now
         arrivals.push({
           stopId: stopId,
@@ -434,8 +437,11 @@ export class RealMTAService {
         return timeA.getTime() - timeB.getTime();
       });
       
-      console.log(`[RealMTAService] Generated ${allRoutes.length} total afternoon routes (${directRoutes.length} direct, ${transferRoutes.length} transfer)`);
-      return allRoutes;
+      // Limit to 5 routes
+      const limitedRoutes = allRoutes.slice(0, 5);
+      
+      console.log(`[RealMTAService] Generated ${limitedRoutes.length} total afternoon routes (from ${directRoutes.length} direct, ${transferRoutes.length} transfer)`);
+      return limitedRoutes;
       
     } catch (error) {
       console.error('[RealMTAService] Failed to calculate all afternoon routes:', error);

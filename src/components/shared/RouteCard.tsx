@@ -53,6 +53,10 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
 
   const subwayLine = getSubwayLineFromMethod(route.method);
   const subwayColor = getSubwayColor(subwayLine);
+  
+  // For transfer routes, use transparent background since TransferRouteIcon handles its own styling
+  const isTransferRoute = subwayLine.includes('→');
+  const iconBackgroundColor = isTransferRoute ? 'transparent' : subwayColor;
 
   return (
     <TouchableOpacity 
@@ -70,7 +74,7 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
             <View 
               style={[
                 styles.routeCard.iconContainer, 
-                { backgroundColor: subwayColor }
+                { backgroundColor: iconBackgroundColor }
               ]}
             >
               {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
