@@ -105,6 +105,10 @@ export class RealMTAService {
   private readonly JAY_ST_C_STOP_ID = 'A41'; // Jay St-MetroTech (A,C)
   private readonly TWENTY_THIRD_ST_C_STOP_ID = 'A23'; // 23rd St-8th Ave (C,E) - Manhattan
   
+  // A train station IDs (from GTFS static data)
+  private readonly JAY_ST_A_STOP_ID = 'A41'; // Jay St-MetroTech (A,C) - same as C train
+  private readonly FOURTEENTH_ST_A_STOP_ID = 'A27'; // 14th St-8th Ave (A,C,E) - Manhattan
+  
   constructor(locationProvider?: LocationProvider) {
     this.locationProvider = locationProvider || new StaticLocationProvider();
     this.cacheManager = new CacheManager();
@@ -129,8 +133,11 @@ export class RealMTAService {
       // Get F→C transfer routes
       const transferRoutes = await this.calculateTransferRoutes(origin, destination, targetArrival);
       
+      // Get F→A→C/E triple-transfer routes
+      const tripleTransferRoutes = await this.calculateTripleTransferRoutes(origin, destination, targetArrival);
+      
       // Combine all routes
-      const allRoutes = [...directRoutes, ...transferRoutes];
+      const allRoutes = [...directRoutes, ...transferRoutes, ...tripleTransferRoutes];
       
       // Sort by arrival time at destination
       allRoutes.sort((a, b) => {
@@ -142,7 +149,7 @@ export class RealMTAService {
       // Limit to 5 routes
       const limitedRoutes = allRoutes.slice(0, 5);
       
-      console.log(`[RealMTAService] Generated ${limitedRoutes.length} total routes (from ${directRoutes.length} direct, ${transferRoutes.length} transfer)`);
+      console.log(`[RealMTAService] Generated ${limitedRoutes.length} total routes (from ${directRoutes.length} direct, ${transferRoutes.length} transfer, ${tripleTransferRoutes.length} triple-transfer)`);
       return limitedRoutes;
       
     } catch (error) {
@@ -427,8 +434,11 @@ export class RealMTAService {
       // Get C→F transfer routes
       const transferRoutes = await this.calculateAfternoonTransferRoutes(origin, destination, targetArrival);
       
+      // Get C/E→A→F triple-transfer routes
+      const tripleTransferRoutes = await this.calculateAfternoonTripleTransferRoutes(origin, destination, targetArrival);
+      
       // Combine all routes
-      const allRoutes = [...directRoutes, ...transferRoutes];
+      const allRoutes = [...directRoutes, ...transferRoutes, ...tripleTransferRoutes];
       
       // Sort by arrival time at destination
       allRoutes.sort((a, b) => {
@@ -440,7 +450,7 @@ export class RealMTAService {
       // Limit to 5 routes
       const limitedRoutes = allRoutes.slice(0, 5);
       
-      console.log(`[RealMTAService] Generated ${limitedRoutes.length} total afternoon routes (from ${directRoutes.length} direct, ${transferRoutes.length} transfer)`);
+      console.log(`[RealMTAService] Generated ${limitedRoutes.length} total afternoon routes (from ${directRoutes.length} direct, ${transferRoutes.length} transfer, ${tripleTransferRoutes.length} triple-transfer)`);
       return limitedRoutes;
       
     } catch (error) {
@@ -753,6 +763,372 @@ export class RealMTAService {
   }
 
   /**
+   * Calculate morning triple-transfer routes (F→A→C/E): Carroll St → Jay St → 14th St → 23rd St
+   */
+  async calculateTripleTransferRoutes(
+    origin: string,
+    destination: string,
+    targetArrival: string
+  ): Promise<Route[]> {
+    try {
+      console.log('[RealMTAService] Calculating F→A→C/E triple-transfer routes from Carroll St to 23rd St');
+      
+      const walkingToStation = await this.locationProvider.getWalkingTimeToTransit('F');
+      const walkingFromStation = this.locationProvider.getWalkingTimeFromTwentyThirdStEighthAve();
+      
+      // Create triple-transfer route configuration
+      const tripleTransferConfig: TransferRouteConfig = {
+        segments: [
+          {
+            line: 'F',
+            direction: 'northbound',
+            fromStation: 'Carroll St',
+            toStation: 'Jay St-MetroTech',
+            feedUrl: this.F_TRAIN_FEED_URL,
+            startStopId: this.CARROLL_ST_STOP_ID,
+            endStopId: this.JAY_ST_F_STOP_ID
+          },
+          {
+            line: 'A',
+            direction: 'northbound',
+            fromStation: 'Jay St-MetroTech',
+            toStation: '14th St-8th Ave',
+            feedUrl: this.ACE_TRAIN_FEED_URL,
+            startStopId: this.JAY_ST_A_STOP_ID,
+            endStopId: this.FOURTEENTH_ST_A_STOP_ID
+          },
+          {
+            line: 'C',
+            direction: 'northbound',
+            fromStation: '14th St-8th Ave',
+            toStation: '23rd St-8th Ave',
+            feedUrl: this.ACE_TRAIN_FEED_URL,
+            startStopId: this.FOURTEENTH_ST_A_STOP_ID,
+            endStopId: this.TWENTY_THIRD_ST_C_STOP_ID
+          }
+        ],
+        transferStations: [
+          {
+            name: 'Jay St-MetroTech',
+            transferTime: 0, // Instant transfer F to A
+            fromLine: 'F',
+            toLine: 'A',
+            fromStopId: this.JAY_ST_F_STOP_ID,
+            toStopId: this.JAY_ST_A_STOP_ID
+          },
+          {
+            name: '14th St-8th Ave',
+            transferTime: 0, // Instant transfer A to C/E
+            fromLine: 'A',
+            toLine: 'C',
+            fromStopId: this.FOURTEENTH_ST_A_STOP_ID,
+            toStopId: this.FOURTEENTH_ST_A_STOP_ID // Same platform for A,C,E
+          }
+        ],
+        getWalkingToStation: () => Promise.resolve(walkingToStation),
+        getWalkingFromStation: () => Promise.resolve(walkingFromStation)
+      };
+      
+      return this.calculateTripleTransferRoutesForConfig(tripleTransferConfig, targetArrival);
+      
+    } catch (error) {
+      console.error('[RealMTAService] Failed to calculate triple-transfer routes:', error);
+      throw new Error(`Unable to fetch triple-transfer route data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Calculate afternoon triple-transfer routes (C/E→A→F): 23rd St → 14th St → Jay St → Carroll St
+   */
+  async calculateAfternoonTripleTransferRoutes(
+    origin: string,
+    destination: string,
+    targetArrival: string
+  ): Promise<Route[]> {
+    try {
+      console.log('[RealMTAService] Calculating C/E→A→F triple-transfer routes from 23rd St to Carroll St');
+      
+      const walkingToStation = await this.locationProvider.getWalkingTimeFromWorkToTwentyThirdStEighthAve();
+      const walkingFromStation = await this.locationProvider.getWalkingTimeFromCarrollStToHome();
+      
+      // Create reverse triple-transfer route configuration
+      const tripleTransferConfig: TransferRouteConfig = {
+        segments: [
+          {
+            line: 'C',
+            direction: 'southbound',
+            fromStation: '23rd St-8th Ave',
+            toStation: '14th St-8th Ave',
+            feedUrl: this.ACE_TRAIN_FEED_URL,
+            startStopId: this.TWENTY_THIRD_ST_C_STOP_ID,
+            endStopId: this.FOURTEENTH_ST_A_STOP_ID
+          },
+          {
+            line: 'A',
+            direction: 'southbound',
+            fromStation: '14th St-8th Ave',
+            toStation: 'Jay St-MetroTech',
+            feedUrl: this.ACE_TRAIN_FEED_URL,
+            startStopId: this.FOURTEENTH_ST_A_STOP_ID,
+            endStopId: this.JAY_ST_A_STOP_ID
+          },
+          {
+            line: 'F',
+            direction: 'southbound',
+            fromStation: 'Jay St-MetroTech',
+            toStation: 'Carroll St',
+            feedUrl: this.F_TRAIN_FEED_URL,
+            startStopId: this.JAY_ST_F_STOP_ID,
+            endStopId: this.CARROLL_ST_STOP_ID
+          }
+        ],
+        transferStations: [
+          {
+            name: '14th St-8th Ave',
+            transferTime: 0, // Instant transfer C/E to A
+            fromLine: 'C',
+            toLine: 'A',
+            fromStopId: this.FOURTEENTH_ST_A_STOP_ID,
+            toStopId: this.FOURTEENTH_ST_A_STOP_ID // Same platform for A,C,E
+          },
+          {
+            name: 'Jay St-MetroTech',
+            transferTime: 0, // Instant transfer A to F
+            fromLine: 'A',
+            toLine: 'F',
+            fromStopId: this.JAY_ST_A_STOP_ID,
+            toStopId: this.JAY_ST_F_STOP_ID
+          }
+        ],
+        getWalkingToStation: () => Promise.resolve(walkingToStation),
+        getWalkingFromStation: () => Promise.resolve(walkingFromStation)
+      };
+      
+      return this.calculateTripleTransferRoutesForConfig(tripleTransferConfig, targetArrival);
+      
+    } catch (error) {
+      console.error('[RealMTAService] Failed to calculate afternoon triple-transfer routes:', error);
+      throw new Error(`Unable to fetch afternoon triple-transfer route data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Core triple-transfer route calculation logic
+   */
+  private async calculateTripleTransferRoutesForConfig(
+    config: TransferRouteConfig,
+    targetArrival: string
+  ): Promise<Route[]> {
+    const routes: Route[] = [];
+    const targetTime = this.parseTime(targetArrival);
+    
+    // Get walking times
+    const walkingToStation = await config.getWalkingToStation();
+    const walkingFromStation = await config.getWalkingFromStation();
+    
+    // Fetch arrivals for all three segments
+    const firstSegment = config.segments[0];
+    const secondSegment = config.segments[1];
+    const thirdSegment = config.segments[2];
+    
+    const firstSegmentArrivals = await this.fetchTrainArrivalsFromFeed(
+      firstSegment.feedUrl,
+      firstSegment.direction,
+      firstSegment.fromStation,
+      firstSegment.line,
+      firstSegment.startStopId
+    );
+    
+    const secondSegmentArrivals = await this.fetchTrainArrivalsFromFeed(
+      secondSegment.feedUrl,
+      secondSegment.direction,
+      secondSegment.fromStation,
+      secondSegment.line,
+      secondSegment.startStopId
+    );
+    
+    const thirdSegmentArrivals = await this.fetchTrainArrivalsFromFeed(
+      thirdSegment.feedUrl,
+      thirdSegment.direction,
+      thirdSegment.fromStation,
+      thirdSegment.line,
+      thirdSegment.startStopId
+    );
+    
+    // Calculate routes for each first segment train
+    for (let i = 0; i < firstSegmentArrivals.length; i++) {
+      const firstTrainArrival = firstSegmentArrivals[i];
+      const firstTrainDepartureTime = new Date(firstTrainArrival.departureTime! * 1000);
+      
+      // Calculate when user needs to leave origin
+      const leaveOriginTime = new Date(firstTrainDepartureTime.getTime() - walkingToStation * 60000);
+      
+      // Skip if user needs to leave in the past
+      if (leaveOriginTime.getTime() < Date.now()) {
+        continue;
+      }
+      
+      // Calculate arrival at first transfer station
+      const firstSegmentTravelTime = this.getSegmentTravelTime(firstSegment);
+      const arrivalAtFirstTransfer = new Date(firstTrainDepartureTime.getTime() + firstSegmentTravelTime * 60000);
+      
+      // Find next available train on second segment after first transfer
+      const firstTransferStation = config.transferStations[0];
+      const firstTransferEarliestDeparture = new Date(arrivalAtFirstTransfer.getTime() + firstTransferStation.transferTime * 60000);
+      
+      // Find available second segment trains
+      const availableSecondTrains = secondSegmentArrivals.filter(train => {
+        const trainDepartureTime = new Date(train.departureTime! * 1000);
+        return trainDepartureTime.getTime() >= firstTransferEarliestDeparture.getTime();
+      });
+      
+      if (availableSecondTrains.length === 0) continue;
+      
+      const secondTrainDeparture = availableSecondTrains[0];
+      const secondTrainDepartureTime = new Date(secondTrainDeparture.departureTime! * 1000);
+      
+      // Calculate arrival at second transfer station
+      const secondSegmentTravelTime = this.getSegmentTravelTime(secondSegment);
+      const arrivalAtSecondTransfer = new Date(secondTrainDepartureTime.getTime() + secondSegmentTravelTime * 60000);
+      
+      // Find next available train on third segment after second transfer
+      const secondTransferStation = config.transferStations[1];
+      const secondTransferEarliestDeparture = new Date(arrivalAtSecondTransfer.getTime() + secondTransferStation.transferTime * 60000);
+      
+      // Find available third segment trains
+      const availableThirdTrains = thirdSegmentArrivals.filter(train => {
+        const trainDepartureTime = new Date(train.departureTime! * 1000);
+        return trainDepartureTime.getTime() >= secondTransferEarliestDeparture.getTime();
+      });
+      
+      if (availableThirdTrains.length === 0) continue;
+      
+      const thirdTrainDeparture = availableThirdTrains[0];
+      const thirdTrainDepartureTime = new Date(thirdTrainDeparture.departureTime! * 1000);
+      
+      // Calculate final arrival
+      const thirdSegmentTravelTime = this.getSegmentTravelTime(thirdSegment);
+      const arrivalAtFinalStation = new Date(thirdTrainDepartureTime.getTime() + thirdSegmentTravelTime * 60000);
+      const finalArrivalTime = new Date(arrivalAtFinalStation.getTime() + walkingFromStation * 60000);
+      
+      // Calculate total journey time and wait times
+      const totalDuration = Math.round((finalArrivalTime.getTime() - Date.now()) / 60000);
+      const firstWaitTime = Math.max(0, Math.round((firstTrainDepartureTime.getTime() - Date.now() - walkingToStation * 60000) / 60000));
+      const firstTransferWaitTime = Math.round((secondTrainDepartureTime.getTime() - arrivalAtFirstTransfer.getTime()) / 60000);
+      const secondTransferWaitTime = Math.round((thirdTrainDepartureTime.getTime() - arrivalAtSecondTransfer.getTime()) / 60000);
+      
+      // Build route steps for triple-transfer route
+      const steps: RouteStep[] = [
+        {
+          type: 'walk',
+          description: `Walk to ${firstSegment.fromStation} station`,
+          duration: walkingToStation,
+          dataSource: 'fixed',
+          toStation: firstSegment.fromStation
+        },
+        {
+          type: 'wait',
+          description: `Wait for ${firstSegment.direction} ${firstSegment.line} train`,
+          duration: firstWaitTime,
+          dataSource: 'realtime',
+          fromStation: firstSegment.fromStation
+        },
+        {
+          type: 'transit',
+          description: `Take ${firstSegment.line} train to ${firstTransferStation.name}`,
+          duration: firstSegmentTravelTime,
+          dataSource: 'realtime',
+          line: firstSegment.line,
+          fromStation: firstSegment.fromStation,
+          toStation: firstTransferStation.name
+        },
+        {
+          type: 'transfer',
+          description: `Transfer to ${secondSegment.line} train at ${firstTransferStation.name}`,
+          duration: firstTransferStation.transferTime,
+          dataSource: 'fixed',
+          transferTime: firstTransferStation.transferTime,
+          transferStation: firstTransferStation.name,
+          nextLine: secondSegment.line
+        },
+        {
+          type: 'wait',
+          description: `Wait for ${secondSegment.direction} ${secondSegment.line} train`,
+          duration: firstTransferWaitTime,
+          dataSource: 'realtime',
+          fromStation: firstTransferStation.name
+        },
+        {
+          type: 'transit',
+          description: `Take ${secondSegment.line} train to ${secondTransferStation.name}`,
+          duration: secondSegmentTravelTime,
+          dataSource: 'realtime',
+          line: secondSegment.line,
+          fromStation: firstTransferStation.name,
+          toStation: secondTransferStation.name
+        },
+        {
+          type: 'transfer',
+          description: `Transfer to ${thirdSegment.line} train at ${secondTransferStation.name}`,
+          duration: secondTransferStation.transferTime,
+          dataSource: 'fixed',
+          transferTime: secondTransferStation.transferTime,
+          transferStation: secondTransferStation.name,
+          nextLine: thirdSegment.line
+        },
+        {
+          type: 'wait',
+          description: `Wait for ${thirdSegment.direction} ${thirdSegment.line} train`,
+          duration: secondTransferWaitTime,
+          dataSource: 'realtime',
+          fromStation: secondTransferStation.name
+        },
+        {
+          type: 'transit',
+          description: `Take ${thirdSegment.line} train to ${thirdSegment.toStation}`,
+          duration: thirdSegmentTravelTime,
+          dataSource: 'realtime',
+          line: thirdSegment.line,
+          fromStation: secondTransferStation.name,
+          toStation: thirdSegment.toStation
+        },
+        {
+          type: 'walk',
+          description: 'Walk to destination',
+          duration: walkingFromStation,
+          dataSource: 'fixed',
+          fromStation: thirdSegment.toStation
+        }
+      ];
+      
+      const route: Route = {
+        id: 2000 + i, // Use different ID range for triple-transfer routes
+        arrivalTime: this.formatTime(finalArrivalTime),
+        duration: `${totalDuration} min`,
+        method: `${firstSegment.line}→${secondSegment.line}→${thirdSegment.line} trains + Walk`,
+        details: `Take ${firstSegment.line} train from ${firstSegment.fromStation} to ${firstTransferStation.name}, transfer to ${secondSegment.line} train to ${secondTransferStation.name}, transfer to ${thirdSegment.line} train to ${thirdSegment.toStation}, then walk to destination`,
+        transfers: 2,
+        walkingDistance: '0.4 mi',
+        walkingToTransit: walkingToStation,
+        isRealTimeData: true,
+        confidence: 'high',
+        startingStation: firstSegment.fromStation,
+        endingStation: thirdSegment.toStation,
+        waitTime: firstWaitTime,
+        nextTrainDeparture: this.formatTime(firstTrainDepartureTime),
+        finalWalkingTime: walkingFromStation,
+        transitTime: firstSegmentTravelTime + firstTransferStation.transferTime + firstTransferWaitTime + secondSegmentTravelTime + secondTransferStation.transferTime + secondTransferWaitTime + thirdSegmentTravelTime,
+        steps: steps
+      };
+      
+      routes.push(route);
+    }
+    
+    console.log(`[RealMTAService] Generated ${routes.length} triple-transfer routes`);
+    return routes;
+  }
+
+  /**
    * Get travel time for a route segment (using GTFS schedule data)
    * Simplified - in real implementation would parse GTFS static data
    */
@@ -769,6 +1145,22 @@ export class RealMTAService {
     }
     if (segment.line === 'F' && segment.fromStation === 'Jay St-MetroTech' && segment.toStation === 'Carroll St') {
       return 7; // Jay St-MetroTech to Carroll St on F train (reverse)
+    }
+    
+    // A train segments for triple-transfer routes
+    if (segment.line === 'A' && segment.fromStation === 'Jay St-MetroTech' && segment.toStation === '14th St-8th Ave') {
+      return 8; // Jay St-MetroTech to 14th St-8th Ave on A train
+    }
+    if (segment.line === 'A' && segment.fromStation === '14th St-8th Ave' && segment.toStation === 'Jay St-MetroTech') {
+      return 8; // 14th St-8th Ave to Jay St-MetroTech on A train (reverse)
+    }
+    
+    // C train segments for triple-transfer routes  
+    if (segment.line === 'C' && segment.fromStation === '14th St-8th Ave' && segment.toStation === '23rd St-8th Ave') {
+      return 3; // 14th St-8th Ave to 23rd St-8th Ave on C train
+    }
+    if (segment.line === 'C' && segment.fromStation === '23rd St-8th Ave' && segment.toStation === '14th St-8th Ave') {
+      return 3; // 23rd St-8th Ave to 14th St-8th Ave on C train (reverse)
     }
     
     // Fallback to estimated time

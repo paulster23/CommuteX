@@ -94,6 +94,15 @@ export class StationMappingService {
       endingStation: '23rd St',
       finalWalkingDistance: '0.5 mi',
       finalWalkingTime: 10
+    },
+    'F→A→C': {
+      startingStation: 'Carroll St',
+      transferStation: 'Jay St-MetroTech',
+      transferToLines: ['A'],
+      transferWalkingTime: 0, // Same platform transfer F to A
+      endingStation: '23rd St-8th Ave',
+      finalWalkingDistance: '0.3 mi', // 23rd St-8th Ave to 512 W 22nd St
+      finalWalkingTime: 6 // ~6 minute walk from 8th Ave to between 10th/11th Ave
     }
   };
 

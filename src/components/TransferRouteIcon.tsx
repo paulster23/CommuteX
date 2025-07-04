@@ -21,23 +21,24 @@ export function TransferRouteIcon({ routeLine }: TransferRouteIconProps) {
     );
   }
   
-  // Transfer route
-  const [firstLine, secondLine] = routeLine.split('→');
+  // Transfer route - can be 2 or 3 lines
+  const lines = routeLine.split('→');
   
   return (
     <View style={styles.transferContainer}>
-      <View 
-        testID="subway-icon"
-        style={[styles.subwayIcon, { backgroundColor: colors.subway[firstLine as keyof typeof colors.subway] || '#666' }]}
-      >
-        <Text testID={`subway-icon-${firstLine}`} style={styles.subwayIconText}>{firstLine}</Text>
-      </View>
-      <View 
-        testID="subway-icon"
-        style={[styles.subwayIcon, styles.secondIcon, { backgroundColor: colors.subway[secondLine as keyof typeof colors.subway] || '#666' }]}
-      >
-        <Text testID={`subway-icon-${secondLine}`} style={styles.subwayIconText}>{secondLine}</Text>
-      </View>
+      {lines.map((line, index) => (
+        <View 
+          key={index}
+          testID="subway-icon"
+          style={[
+            styles.subwayIcon, 
+            index > 0 && styles.secondIcon,
+            { backgroundColor: colors.subway[line as keyof typeof colors.subway] || '#666' }
+          ]}
+        >
+          <Text testID={`subway-icon-${line}`} style={styles.subwayIconText}>{line}</Text>
+        </View>
+      ))}
     </View>
   );
 }
