@@ -17,7 +17,7 @@ export function AfternoonCommuteApp() {
         destination: AFTERNOON_COMMUTE_DATA.home,
         targetArrival: AFTERNOON_COMMUTE_DATA.targetArrival,
         calculateRoutes: (service: RealMTAService, origin: string, destination: string, targetArrival: string) => 
-          service.calculateAfternoonRoutes(origin, destination, targetArrival)
+          service.calculateAllAfternoonRoutes(origin, destination, targetArrival)
       }}
     />
   );

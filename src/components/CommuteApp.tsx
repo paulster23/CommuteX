@@ -17,7 +17,7 @@ export function CommuteApp() {
         destination: COMMUTE_DATA.work,
         targetArrival: COMMUTE_DATA.targetArrival,
         calculateRoutes: (service: RealMTAService, origin: string, destination: string, targetArrival: string) => 
-          service.calculateRoutes(origin, destination, targetArrival),
+          service.calculateAllRoutes(origin, destination, targetArrival),
         testId: 'app-container'
       }}
     />

@@ -42,7 +42,8 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
   }, [isExpanded]);
 
   const getSubwayLineFromMethod = (method: string): string => {
-    const match = method.match(/^([A-Z0-9]+)\s+train/);
+    // Handle both single-leg "F train" and multi-leg "F→C trains" patterns
+    const match = method.match(/^([A-Z0-9]+(?:→[A-Z0-9]+)?)\s+trains?/);
     return match ? match[1] : '';
   };
 
