@@ -1,3 +1,5 @@
+import * as ExpoLocation from 'expo-location';
+
 export interface Location {
   lat: number;
   lng: number;
@@ -192,24 +194,31 @@ export class StaticLocationProvider implements LocationProvider {
   }
 }
 
-// Future GPS implementation placeholder
+// GPS implementation using expo-location
 export class GPSLocationProvider implements LocationProvider {
   async getCurrentLocation(): Promise<Location> {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation not supported'));
-        return;
-      }
+    
+    // Request location permissions
+    const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      throw new Error('Location permission denied');
+    }
 
-      navigator.geolocation.getCurrentPosition(
-        position => resolve({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        }),
-        error => reject(error),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
-      );
-    });
+    // Get current position with high accuracy
+    try {
+      const position = await ExpoLocation.getCurrentPositionAsync({
+        accuracy: ExpoLocation.LocationAccuracy.High,
+        timeout: 15000,
+        maximumAge: 10000
+      });
+
+      return {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
+    } catch (error) {
+      throw error; // Re-throw the original error (timeout, service unavailable, etc.)
+    }
   }
 
   async getWalkingTime(origin: Location, destination: TransitStop): Promise<number> {

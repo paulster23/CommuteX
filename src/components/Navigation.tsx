@@ -1,9 +1,10 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Sun, Moon, Settings } from 'lucide-react-native';
+import { Sun, Moon, Settings, MapPin } from 'lucide-react-native';
 import { HomeScreen } from '../screens/HomeScreen';
 import { AfternoonScreen } from '../screens/AfternoonScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { HelpScreen } from '../screens/HelpScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -20,6 +21,8 @@ export function AppNavigator() {
             IconComponent = Moon;
           } else if (route.name === 'Settings') {
             IconComponent = Settings;
+          } else if (route.name === 'Help') {
+            IconComponent = MapPin;
           }
 
           return IconComponent ? <IconComponent size={size} color={color} /> : null;
@@ -51,6 +54,11 @@ export function AppNavigator() {
         name="Afternoon" 
         component={AfternoonScreen}
         options={{ tabBarLabel: 'Afternoon' }}
+      />
+      <Tab.Screen 
+        name="Help" 
+        component={HelpScreen}
+        options={{ tabBarLabel: 'Help' }}
       />
       <Tab.Screen 
         name="Settings" 

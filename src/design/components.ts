@@ -165,7 +165,7 @@ export const createRouteCardStyles = (theme: Theme) => StyleSheet.create({
     marginRight: spacing.md,
   },
   iconContainer: {
-    width: 40,
+    minWidth: 40,
     height: 40,
     borderRadius: borderRadius.md,
     justifyContent: 'center',

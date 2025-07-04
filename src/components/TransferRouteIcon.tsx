@@ -10,13 +10,15 @@ export function TransferRouteIcon({ routeLine }: TransferRouteIconProps) {
   const isTransfer = routeLine.includes('→');
   
   if (!isTransfer) {
-    // Single route
+    // Single route - use same container structure for consistency
     return (
-      <View 
-        testID="subway-icon"
-        style={[styles.subwayIcon, { backgroundColor: colors.subway[routeLine as keyof typeof colors.subway] || '#666' }]}
-      >
-        <Text style={styles.subwayIconText}>{routeLine}</Text>
+      <View style={styles.singleRouteContainer}>
+        <View 
+          testID="subway-icon"
+          style={[styles.singleRouteIcon, { backgroundColor: colors.subway[routeLine as keyof typeof colors.subway] || '#666' }]}
+        >
+          <Text style={styles.singleRouteIconText}>{routeLine}</Text>
+        </View>
       </View>
     );
   }
@@ -24,8 +26,11 @@ export function TransferRouteIcon({ routeLine }: TransferRouteIconProps) {
   // Transfer route - can be 2 or 3 lines
   const lines = routeLine.split('→');
   
+  // Use different container style based on number of transfers
+  const containerStyle = lines.length === 3 ? styles.tripleTransferContainer : styles.transferContainer;
+  
   return (
-    <View style={styles.transferContainer}>
+    <View style={containerStyle}>
       {lines.map((line, index) => (
         <View 
           key={index}
@@ -44,22 +49,51 @@ export function TransferRouteIcon({ routeLine }: TransferRouteIconProps) {
 }
 
 const styles = StyleSheet.create({
+  singleRouteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start', // Consistent left alignment with other route types
+    minWidth: 40, // Minimum width to match iconContainer
+    height: 40,
+  },
   transferContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-start', // Align to left for consistent positioning
+    minWidth: 40, // Minimum width, but can expand
+    height: 40,
   },
-  subwayIcon: {
-    width: 32,
+  tripleTransferContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start', // Align to left for consistent positioning
+    minWidth: 40, // Minimum width like others, can expand naturally
+    height: 40,
+  },
+  singleRouteIcon: {
+    width: 32, // Original size for single routes
     height: 32,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  singleRouteIconText: {
+    fontSize: 16, // Original font size for single routes
+    fontWeight: '700',
+    color: '#fff',
+  },
+  subwayIcon: {
+    width: 28, // Smaller to fit multiple icons
+    height: 28,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   secondIcon: {
-    marginLeft: 4,
+    marginLeft: 3, // Reduced spacing for tighter layout
   },
   subwayIconText: {
-    fontSize: 16,
+    fontSize: 14, // Smaller font for better fit
     fontWeight: '700',
     color: '#fff',
   },

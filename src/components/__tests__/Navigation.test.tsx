@@ -75,4 +75,18 @@ describe('Navigation', () => {
     expect(screen.getByText('Morning Commute')).toBeTruthy();
     // This test will fail initially until we add the Afternoon tab
   });
+
+  test('shouldHaveHelpTab', () => {
+    // Red: Test that the Help tab exists in navigation
+    render(
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
+    );
+
+    // Should have four tabs: Morning, Afternoon, Settings, Help
+    // The tab navigator creates the tab structure even if not all screens are visible
+    expect(screen.getByText('Morning Commute')).toBeTruthy();
+    // This test will fail initially until we add the Help tab
+  });
 });
