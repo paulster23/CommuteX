@@ -103,7 +103,7 @@ export class RealMTAService {
   
   // C train station IDs (from GTFS static data)
   private readonly JAY_ST_C_STOP_ID = 'A41'; // Jay St-MetroTech (A,C)
-  private readonly TWENTY_THIRD_ST_C_STOP_ID = 'A24'; // 23rd St-Ely Av (C,E)
+  private readonly TWENTY_THIRD_ST_C_STOP_ID = 'A23'; // 23rd St-8th Ave (C,E) - Manhattan
   
   constructor(locationProvider?: LocationProvider) {
     this.locationProvider = locationProvider || new StaticLocationProvider();
@@ -477,7 +477,7 @@ export class RealMTAService {
       console.log('[RealMTAService] Calculating F→C transfer routes from Carroll St to 23rd St');
       
       const walkingToStation = await this.locationProvider.getWalkingTimeToTransit('F');
-      const walkingFromStation = this.locationProvider.getWalkingTimeFromTwentyThirdSt();
+      const walkingFromStation = this.locationProvider.getWalkingTimeFromTwentyThirdStEighthAve();
       
       // Create transfer route configuration
       const transferConfig: TransferRouteConfig = {
@@ -495,7 +495,7 @@ export class RealMTAService {
             line: 'C',
             direction: 'northbound',
             fromStation: 'Jay St-MetroTech',
-            toStation: '23rd St-Ely Av',
+            toStation: '23rd St-8th Ave',
             feedUrl: this.ACE_TRAIN_FEED_URL,
             startStopId: this.JAY_ST_C_STOP_ID,
             endStopId: this.TWENTY_THIRD_ST_C_STOP_ID
@@ -534,7 +534,7 @@ export class RealMTAService {
     try {
       console.log('[RealMTAService] Calculating C→F transfer routes from 23rd St to Carroll St');
       
-      const walkingToStation = await this.locationProvider.getWalkingTimeFromWorkToTwentyThirdSt();
+      const walkingToStation = await this.locationProvider.getWalkingTimeFromWorkToTwentyThirdStEighthAve();
       const walkingFromStation = await this.locationProvider.getWalkingTimeFromCarrollStToHome();
       
       // Create reverse transfer route configuration
@@ -543,7 +543,7 @@ export class RealMTAService {
           {
             line: 'C',
             direction: 'southbound',
-            fromStation: '23rd St-Ely Av',
+            fromStation: '23rd St-8th Ave',
             toStation: 'Jay St-MetroTech',
             feedUrl: this.ACE_TRAIN_FEED_URL,
             startStopId: this.TWENTY_THIRD_ST_C_STOP_ID,
@@ -755,11 +755,11 @@ export class RealMTAService {
     if (segment.line === 'F' && segment.fromStation === 'Carroll St' && segment.toStation === 'Jay St-MetroTech') {
       return 7; // Carroll St to Jay St-MetroTech on F train
     }
-    if (segment.line === 'C' && segment.fromStation === 'Jay St-MetroTech' && segment.toStation === '23rd St-Ely Av') {
-      return 11; // Jay St-MetroTech to 23rd St-Ely Av on C train
+    if (segment.line === 'C' && segment.fromStation === 'Jay St-MetroTech' && segment.toStation === '23rd St-8th Ave') {
+      return 11; // Jay St-MetroTech to 23rd St-8th Ave on C train
     }
-    if (segment.line === 'C' && segment.fromStation === '23rd St-Ely Av' && segment.toStation === 'Jay St-MetroTech') {
-      return 11; // 23rd St-Ely Av to Jay St-MetroTech on C train (reverse)
+    if (segment.line === 'C' && segment.fromStation === '23rd St-8th Ave' && segment.toStation === 'Jay St-MetroTech') {
+      return 11; // 23rd St-8th Ave to Jay St-MetroTech on C train (reverse)
     }
     if (segment.line === 'F' && segment.fromStation === 'Jay St-MetroTech' && segment.toStation === 'Carroll St') {
       return 7; // Jay St-MetroTech to Carroll St on F train (reverse)

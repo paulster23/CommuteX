@@ -152,11 +152,16 @@ export class StaticLocationProvider implements LocationProvider {
     return closestStop;
   }
 
-  // Get walking time from 23rd St station to work destination
+  // Get walking time from 23rd St station (F train) to work destination  
   getWalkingTimeFromTwentyThirdSt(): number {
-    // Use actual measured distance of 0.7 miles instead of Haversine calculation
-    const actualDistance = 0.7; // miles - real walking distance accounting for NYC street grid
-    return calculateWalkingTime(actualDistance, true, MANHATTAN_WALKING_SPEED_MPH);
+    // Return exact time from StationMappingService for consistency
+    return 8; // minutes - from StationMappingService: 23rd St (6th Ave) to 512 W 22nd St
+  }
+
+  // Get walking time from 23rd St-8th Ave station (C train) to work destination
+  getWalkingTimeFromTwentyThirdStEighthAve(): number {
+    // Return exact time from StationMappingService for consistency
+    return 6; // minutes - from StationMappingService: 23rd St-8th Ave to 512 W 22nd St
   }
 
   // Get coordinates for specific locations
@@ -168,11 +173,16 @@ export class StaticLocationProvider implements LocationProvider {
     return this.twentyThirdStLocation;
   }
 
-  // Get walking time from work to 23rd St station (reverse of morning commute)
+  // Get walking time from work to 23rd St station (F train) (reverse of morning commute)
   async getWalkingTimeFromWorkToTwentyThirdSt(): Promise<number> {
-    // Use actual measured distance of 0.7 miles instead of Haversine calculation
-    const actualDistance = 0.7; // miles - same route, real walking distance accounting for NYC street grid
-    return calculateWalkingTime(actualDistance, true, MANHATTAN_WALKING_SPEED_MPH);
+    // Return exact time from StationMappingService for consistency (same route, reverse direction)
+    return 8; // minutes - same as morning commute
+  }
+
+  // Get walking time from work to 23rd St-8th Ave station (C train)
+  async getWalkingTimeFromWorkToTwentyThirdStEighthAve(): Promise<number> {
+    // Return exact time from StationMappingService for consistency (same route, reverse direction)
+    return 6; // minutes - same as morning commute
   }
 
   // Get walking time from Carroll St station to home (reverse of morning commute)
