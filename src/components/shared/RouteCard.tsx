@@ -117,7 +117,7 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
         <View 
           style={{ 
             paddingVertical: 16, 
-            paddingHorizontal: 24,
+            paddingHorizontal: 12,
             borderTopWidth: 1, 
             borderTopColor: styles.theme.colors.borderLight 
           }}

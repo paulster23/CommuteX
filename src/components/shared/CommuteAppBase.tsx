@@ -131,7 +131,7 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
 
       <ScrollView
         testID={config.title === 'Morning Commute' ? 'scroll-view' : 'afternoon-routes-container'}
-        style={{ flex: 1, paddingHorizontal: 20 }}
+        style={{ flex: 1, paddingHorizontal: 0 }}
         showsVerticalScrollIndicator={false}
         bounces={Platform.OS === 'ios'}
         alwaysBounceVertical={Platform.OS === 'ios'}
