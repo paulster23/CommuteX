@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Platform, RefreshControl, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, Platform, RefreshControl, ScrollView, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MapPin, Navigation, Clock, AlertCircle, Train, Zap } from 'lucide-react-native';
 import { GPSLocationProvider, Location } from '../services/LocationService';
@@ -40,6 +40,8 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
   });
 
   const [direction, setDirection] = useState<'northbound' | 'southbound'>('northbound');
+  const [directionChanging, setDirectionChanging] = useState(false);
+  const hasInitiallyLoaded = useRef(false);
   
   const [departureState, setDepartureState] = useState<DepartureState>({
     departures: null,
@@ -52,8 +54,10 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
 
   const gpsProvider = locationProvider || new GPSLocationProvider();
 
-  const fetchDepartures = useCallback(async (station: any, direction: 'northbound' | 'southbound') => {
-    setDepartureState(prev => ({ ...prev, loading: true, error: null }));
+  const fetchDepartures = useCallback(async (station: any, direction: 'northbound' | 'southbound', silent = false) => {
+    if (!silent) {
+      setDepartureState(prev => ({ ...prev, loading: true, error: null }));
+    }
 
     try {
       const departures = await StationDepartureService.getDeparturesForStation(station, direction);
@@ -62,6 +66,8 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
         loading: false,
         error: null
       });
+      // Mark that we've successfully loaded departures at least once
+      hasInitiallyLoaded.current = true;
     } catch (error) {
       console.error('Failed to fetch departures:', error);
       setDepartureState({
@@ -141,7 +147,17 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
   // Handle direction changes
   useEffect(() => {
     if (locationState.nearestStation && !locationState.loading) {
-      fetchDepartures(locationState.nearestStation.station, direction);
+      // Use silent mode for direction changes to prevent UI flashing
+      const isDirectionChange = hasInitiallyLoaded.current;
+      if (isDirectionChange) {
+        setDirectionChanging(true);
+        fetchDepartures(locationState.nearestStation.station, direction, true).finally(() => {
+          setDirectionChanging(false);
+        });
+      } else {
+        // Initial load - use normal mode
+        fetchDepartures(locationState.nearestStation.station, direction);
+      }
     }
   }, [direction, locationState.nearestStation, locationState.loading, fetchDepartures]);
 
@@ -236,7 +252,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
 
         {/* Next Departures */}
         {locationState.nearestStation && departureState.departures && (
-          <View style={[styles.routeCard.container, screenStyles.card]}>
+          <View style={[styles.routeCard.container, screenStyles.card, { opacity: directionChanging ? 0.7 : 1.0 }]}>
             <View style={styles.routeCard.header}>
               <View style={styles.routeCard.mainInfo}>
                 <View style={[styles.routeCard.iconContainer, { backgroundColor: styles.theme.colors.primary }]}>
@@ -293,8 +309,8 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
           </View>
         )}
 
-        {/* Departures Loading */}
-        {locationState.nearestStation && departureState.loading && (
+        {/* Departures Loading - Only show during initial load, not direction changes */}
+        {locationState.nearestStation && departureState.loading && !directionChanging && (
           <View style={[styles.routeCard.container, screenStyles.card]}>
             <View style={screenStyles.loadingContent}>
               <Train size={24} color={styles.theme.colors.primary} />
@@ -332,7 +348,15 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                 direction === 'northbound' && [screenStyles.directionToggleActive, { backgroundColor: styles.theme.colors.primary, borderColor: styles.theme.colors.primary }]
               ]}
               onPress={() => handleDirectionChange('northbound')}
+              disabled={directionChanging}
             >
+              {directionChanging && direction === 'northbound' ? (
+                <ActivityIndicator 
+                  size="small" 
+                  color="#FFFFFF" 
+                  style={{ marginRight: 4 }}
+                />
+              ) : null}
               <Text style={[
                 screenStyles.directionToggleText,
                 { color: styles.theme.colors.textSecondary },
@@ -348,7 +372,15 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                 direction === 'southbound' && [screenStyles.directionToggleActive, { backgroundColor: styles.theme.colors.primary, borderColor: styles.theme.colors.primary }]
               ]}
               onPress={() => handleDirectionChange('southbound')}
+              disabled={directionChanging}
             >
+              {directionChanging && direction === 'southbound' ? (
+                <ActivityIndicator 
+                  size="small" 
+                  color="#FFFFFF" 
+                  style={{ marginRight: 4 }}
+                />
+              ) : null}
               <Text style={[
                 screenStyles.directionToggleText,
                 { color: styles.theme.colors.textSecondary },
@@ -425,6 +457,9 @@ const screenStyles = StyleSheet.create({
     borderRadius: 4, // Reduced from 6
     marginHorizontal: 3, // Reduced from 4
     borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   directionToggleActive: {
     // Colors now applied inline using theme
