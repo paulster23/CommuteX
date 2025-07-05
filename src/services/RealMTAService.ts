@@ -332,21 +332,21 @@ export class RealMTAService {
       const steps: RouteStep[] = [
         {
           type: 'walk',
-          description: `Walk to ${config.startStation} station`,
+          description: `to ${config.startStation}`,
           duration: walkingToStation,
           dataSource: 'fixed',
           toStation: config.startStation
         },
         {
           type: 'wait',
-          description: `Wait for ${config.direction} ${config.line} train`,
+          description: 'wait',
           duration: waitTime,
           dataSource: 'realtime',
           fromStation: config.startStation
         },
         {
           type: 'transit',
-          description: `Take ${config.line} train to ${config.endStation}`,
+          description: `to ${config.endStation}`,
           duration: trainTravelTime,
           dataSource: 'realtime',
           line: config.line,
@@ -355,7 +355,7 @@ export class RealMTAService {
         },
         {
           type: 'walk',
-          description: 'Walk to destination',
+          description: 'walk',
           duration: walkingFromStation,
           dataSource: 'fixed',
           fromStation: config.endStation
@@ -685,21 +685,21 @@ export class RealMTAService {
       const steps: RouteStep[] = [
         {
           type: 'walk',
-          description: `Walk to ${firstSegment.fromStation} station`,
+          description: `to ${firstSegment.fromStation}`,
           duration: walkingToStation,
           dataSource: 'fixed',
           toStation: firstSegment.fromStation
         },
         {
           type: 'wait',
-          description: `Wait for ${firstSegment.direction} ${firstSegment.line} train`,
+          description: 'wait',
           duration: firstWaitTime,
           dataSource: 'realtime',
           fromStation: firstSegment.fromStation
         },
         {
           type: 'transit',
-          description: `Take ${firstSegment.line} train to ${transferStation.name}`,
+          description: `to ${transferStation.name}`,
           duration: firstSegmentTravelTime,
           dataSource: 'realtime',
           line: firstSegment.line,
@@ -708,7 +708,7 @@ export class RealMTAService {
         },
         {
           type: 'transfer',
-          description: `Transfer to ${secondSegment.line} train at ${transferStation.name}`,
+          description: 'Transfer',
           duration: transferStation.transferTime,
           dataSource: 'fixed',
           transferTime: transferStation.transferTime,
@@ -717,14 +717,14 @@ export class RealMTAService {
         },
         {
           type: 'wait',
-          description: `Wait for ${secondSegment.direction} ${secondSegment.line} train`,
+          description: 'wait',
           duration: transferWaitTime,
           dataSource: 'realtime',
           fromStation: transferStation.name
         },
         {
           type: 'transit',
-          description: `Take ${secondSegment.line} train to ${secondSegment.toStation}`,
+          description: `to ${secondSegment.toStation}`,
           duration: secondSegmentTravelTime,
           dataSource: 'realtime',
           line: secondSegment.line,
@@ -733,7 +733,7 @@ export class RealMTAService {
         },
         {
           type: 'walk',
-          description: 'Walk to destination',
+          description: 'walk',
           duration: walkingFromStation,
           dataSource: 'fixed',
           fromStation: secondSegment.toStation
@@ -1026,21 +1026,21 @@ export class RealMTAService {
       const steps: RouteStep[] = [
         {
           type: 'walk',
-          description: `Walk to ${firstSegment.fromStation} station`,
+          description: `to ${firstSegment.fromStation}`,
           duration: walkingToStation,
           dataSource: 'fixed',
           toStation: firstSegment.fromStation
         },
         {
           type: 'wait',
-          description: `Wait for ${firstSegment.direction} ${firstSegment.line} train`,
+          description: 'wait',
           duration: firstWaitTime,
           dataSource: 'realtime',
           fromStation: firstSegment.fromStation
         },
         {
           type: 'transit',
-          description: `Take ${firstSegment.line} train to ${firstTransferStation.name}`,
+          description: `to ${firstTransferStation.name}`,
           duration: firstSegmentTravelTime,
           dataSource: 'realtime',
           line: firstSegment.line,
@@ -1049,7 +1049,7 @@ export class RealMTAService {
         },
         {
           type: 'transfer',
-          description: `Transfer to ${secondSegment.line} train at ${firstTransferStation.name}`,
+          description: 'Transfer',
           duration: firstTransferStation.transferTime,
           dataSource: 'fixed',
           transferTime: firstTransferStation.transferTime,
@@ -1058,14 +1058,14 @@ export class RealMTAService {
         },
         {
           type: 'wait',
-          description: `Wait for ${secondSegment.direction} ${secondSegment.line} train`,
+          description: 'wait',
           duration: firstTransferWaitTime,
           dataSource: 'realtime',
           fromStation: firstTransferStation.name
         },
         {
           type: 'transit',
-          description: `Take ${secondSegment.line} train to ${secondTransferStation.name}`,
+          description: `to ${secondTransferStation.name}`,
           duration: secondSegmentTravelTime,
           dataSource: 'realtime',
           line: secondSegment.line,
@@ -1074,7 +1074,7 @@ export class RealMTAService {
         },
         {
           type: 'transfer',
-          description: `Transfer to ${thirdSegment.line} train at ${secondTransferStation.name}`,
+          description: 'Transfer',
           duration: secondTransferStation.transferTime,
           dataSource: 'fixed',
           transferTime: secondTransferStation.transferTime,
@@ -1083,14 +1083,14 @@ export class RealMTAService {
         },
         {
           type: 'wait',
-          description: `Wait for ${thirdSegment.direction} ${thirdSegment.line} train`,
+          description: 'wait',
           duration: secondTransferWaitTime,
           dataSource: 'realtime',
           fromStation: secondTransferStation.name
         },
         {
           type: 'transit',
-          description: `Take ${thirdSegment.line} train to ${thirdSegment.toStation}`,
+          description: `to ${thirdSegment.toStation}`,
           duration: thirdSegmentTravelTime,
           dataSource: 'realtime',
           line: thirdSegment.line,
@@ -1099,7 +1099,7 @@ export class RealMTAService {
         },
         {
           type: 'walk',
-          description: 'Walk to destination',
+          description: 'walk',
           duration: walkingFromStation,
           dataSource: 'fixed',
           fromStation: thirdSegment.toStation
