@@ -97,55 +97,6 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
     setExpandedRoutes(newExpanded);
   };
 
-  const clearAllCaches = async () => {
-    try {
-      console.log('[DEBUG] Clearing all caches...');
-      
-      // Clear service worker caches
-      if ('serviceWorker' in navigator && 'caches' in window) {
-        const cacheNames = await caches.keys();
-        await Promise.all(
-          cacheNames.map(cacheName => {
-            console.log('[DEBUG] Deleting cache:', cacheName);
-            return caches.delete(cacheName);
-          })
-        );
-        
-        // Unregister and re-register service worker
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(
-          registrations.map(registration => {
-            console.log('[DEBUG] Unregistering service worker');
-            return registration.unregister();
-          })
-        );
-      }
-      
-      // Clear application cache
-      if (mtaService && typeof mtaService.clearAllCaches === 'function') {
-        mtaService.clearAllCaches();
-        console.log('[DEBUG] Cleared MTA service caches');
-      }
-      
-      // Clear localStorage and sessionStorage
-      if (typeof Storage !== 'undefined') {
-        localStorage.clear();
-        sessionStorage.clear();
-        console.log('[DEBUG] Cleared browser storage');
-      }
-      
-      // Force reload routes with cache busting
-      console.log('[DEBUG] Reloading routes with fresh data...');
-      setLoading(true);
-      await loadRoutes();
-      
-      alert('All caches cleared successfully! Route improvements should now be visible.');
-      
-    } catch (error) {
-      console.error('[DEBUG] Failed to clear caches:', error);
-      alert('Failed to clear some caches. Try refreshing the page manually.');
-    }
-  };
 
   // Parse origin and destination for display
   const originDisplay = config.origin.split(',')[0];
@@ -176,26 +127,6 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
           </Text>
         </View>
         
-        {/* Debug: Cache Clear Button - only show for morning commute */}
-        {config.title === 'Morning Commute' && (
-          <TouchableOpacity 
-            style={{
-              position: 'absolute',
-              right: 20,
-              top: 20,
-              backgroundColor: '#FF3B30',
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 8,
-              zIndex: 1000
-            }}
-            onPress={clearAllCaches}
-          >
-            <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>
-              Clear Cache
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       <ScrollView
