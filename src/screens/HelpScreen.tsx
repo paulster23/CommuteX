@@ -7,6 +7,8 @@ import { NearestStationService, NearestStationResult } from '../services/Nearest
 import { StationDepartureService, DeparturesByLine } from '../services/StationDepartureService';
 import { getThemeStyles } from '../design/components';
 import { useColorScheme } from 'react-native';
+import { TransferRouteIcon } from '../components/TransferRouteIcon';
+import { TrainTimePill } from '../components/TrainTimePill';
 
 interface LocationState {
   location: Location | null;
@@ -289,18 +291,22 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
               </View>
             </View>
 
-            {/* Departures by Line */}
+            {/* Departures by Line - Horizontal Layout */}
             {Object.entries(departureState.departures).map(([line, departures]) => (
-              <View key={line} style={screenStyles.lineSection}>
-                <Text style={screenStyles.lineTitle}>{line} Line</Text>
-                <View style={screenStyles.departuresContainer}>
+              <View key={line} style={screenStyles.lineRow}>
+                <View style={screenStyles.trainLogoContainer}>
+                  <View testID={`train-logo-${line}`}>
+                    <TransferRouteIcon routeLine={line} />
+                  </View>
+                </View>
+                <View style={screenStyles.timePillsContainer}>
                   {departures.slice(0, 5).map((departure, index) => (
-                    <View key={index} style={screenStyles.departureItem}>
-                      <View style={[screenStyles.trainPill, { backgroundColor: styles.theme.colors.primary }]}>
-                        <Text style={screenStyles.trainPillText}>{line}</Text>
-                      </View>
-                      <Text style={screenStyles.departureTime}>{departure.relativeTime}</Text>
-                    </View>
+                    <TrainTimePill 
+                      key={index}
+                      line={line}
+                      time={departure.relativeTime}
+                      index={index}
+                    />
                   ))}
                 </View>
               </View>
@@ -417,45 +423,23 @@ const screenStyles = StyleSheet.create({
   directionToggleTextActive: {
     color: '#FFFFFF',
   },
-  lineSection: {
+  lineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
-  lineTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 12,
+  trainLogoContainer: {
+    marginRight: 16,
+    width: 50,
+    alignItems: 'flex-start',
   },
-  departuresContainer: {
+  timePillsContainer: {
+    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-  },
-  departureItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
-    marginBottom: 8,
-  },
-  trainPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 6,
-    minWidth: 28,
-    alignItems: 'center',
-  },
-  trainPillText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  departureTime: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
   }
 });

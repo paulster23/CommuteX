@@ -285,7 +285,7 @@ describe('HelpScreen', () => {
   });
 
   test('shouldSeparateMultipleLines', async () => {
-    // Red: Test that multiple lines are displayed separately
+    // Red: Test that multiple lines are displayed as horizontal rows with logos
     const mockLocationProvider = {
       getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
     };
@@ -297,10 +297,12 @@ describe('HelpScreen', () => {
     render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
-      // Should show F line section
-      expect(screen.getByText('F Line')).toBeTruthy();
-      // Should show G line section
-      expect(screen.getByText('G Line')).toBeTruthy();
+      // Should show F and G train logos instead of text titles
+      expect(screen.getByTestId('train-logo-F')).toBeTruthy();
+      expect(screen.getByTestId('train-logo-G')).toBeTruthy();
+      // Should NOT show old "{Line} Line" format
+      expect(() => screen.getByText('F Line')).toThrow();
+      expect(() => screen.getByText('G Line')).toThrow();
     });
   });
 
@@ -320,6 +322,33 @@ describe('HelpScreen', () => {
       // Should show times in minutes format
       expect(screen.getByText('2m')).toBeTruthy();
       expect(screen.getByText('9m')).toBeTruthy();
+    });
+  });
+
+  test('shouldDisplayColoredTimePillsForEachLine', async () => {
+    // Red: Test that time pills use correct MTA colors for each line
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    importedMockGetDeparturesForStation.mockResolvedValue(mockDepartures);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
+    
+    await waitFor(() => {
+      // Should show F line time pills with orange color (#FF6319)
+      expect(screen.getByTestId('time-pill-F-0')).toBeTruthy();
+      expect(screen.getByTestId('time-pill-F-1')).toBeTruthy();
+      
+      // Should show G line time pills with light green color (#6CBE45)
+      expect(screen.getByTestId('time-pill-G-0')).toBeTruthy();
+      expect(screen.getByTestId('time-pill-G-1')).toBeTruthy();
+      
+      // Time pills should contain the departure times
+      expect(screen.getByText('2m')).toBeTruthy();
+      expect(screen.getByText('5m')).toBeTruthy();
     });
   });
 
@@ -426,10 +455,12 @@ describe('HelpScreen', () => {
     render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
-      // Should have 5 departure times for F line
-      const fLineSection = screen.getByText('F Line').parent;
-      // Test will verify structure exists
-      expect(fLineSection).toBeTruthy();
+      // Should have train logo for F line
+      expect(screen.getByTestId('train-logo-F')).toBeTruthy();
+      // Should show up to 5 time pills per line (our mock data has 3 for F, 2 for G)
+      expect(screen.getByTestId('time-pill-F-0')).toBeTruthy(); // 2m
+      expect(screen.getByTestId('time-pill-F-1')).toBeTruthy(); // 9m
+      expect(screen.getByTestId('time-pill-F-2')).toBeTruthy(); // 16m
     });
   });
 });
