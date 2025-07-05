@@ -431,7 +431,7 @@ const screenStyles = StyleSheet.create({
   },
   fixedToggleContainer: {
     position: 'absolute',
-    bottom: 80, // Position above the 80px tall bottom navigation
+    bottom: 8, // Position just above bottom navigation with small gap
     left: 0,
     right: 0,
     paddingHorizontal: 12,
