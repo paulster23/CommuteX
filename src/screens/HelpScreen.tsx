@@ -5,7 +5,7 @@ import { MapPin, Navigation, Clock, AlertCircle, Train } from 'lucide-react-nati
 import { GPSLocationProvider, Location } from '../services/LocationService';
 import { NearestStationService, NearestStationResult } from '../services/NearestStationService';
 import { StationDepartureService, DeparturesByLine } from '../services/StationDepartureService';
-import { getThemeStyles } from '../design/components';
+import { getCompactThemeStyles } from '../design/components';
 import { useColorScheme } from 'react-native';
 import { TransferRouteIcon } from '../components/TransferRouteIcon';
 import { TrainTimePill } from '../components/TrainTimePill';
@@ -30,7 +30,7 @@ interface HelpScreenProps {
 export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
-  const styles = getThemeStyles(isDarkMode);
+  const styles = getCompactThemeStyles(isDarkMode);
   
   const [locationState, setLocationState] = useState<LocationState>({
     location: null,
@@ -253,7 +253,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                   screenStyles.directionToggleText,
                   direction === 'northbound' && screenStyles.directionToggleTextActive
                 ]}>
-                  Northbound
+                  North
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -267,7 +267,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                   screenStyles.directionToggleText,
                   direction === 'southbound' && screenStyles.directionToggleTextActive
                 ]}>
-                  Southbound
+                  South
                 </Text>
               </TouchableOpacity>
             </View>
@@ -285,7 +285,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                 <View style={styles.routeCard.textInfo}>
                   <Text style={styles.routeCard.title}>Next Departures</Text>
                   <Text style={styles.routeCard.subtitle}>
-                    {direction === 'northbound' ? 'Northbound' : 'Southbound'} trains
+                    {direction === 'northbound' ? 'North' : 'South'} trains
                   </Text>
                 </View>
               </View>
@@ -351,28 +351,28 @@ const screenStyles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12, // Reduced from 16 for compact mobile
   },
   card: {
-    marginTop: 16,
+    marginTop: 12, // Reduced from 16 for compact spacing
   },
   loadingContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12, // Reduced from 16
   },
   loadingText: {
-    marginLeft: 12,
+    marginLeft: 8, // Reduced from 12
   },
   errorContent: {
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12, // Reduced from 16
   },
   errorMessage: {
     textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 20,
+    marginTop: 6, // Reduced from 8
+    lineHeight: 16, // Reduced from 20
   },
   stationName: {
     fontWeight: '600',
@@ -383,12 +383,12 @@ const screenStyles = StyleSheet.create({
     fontWeight: '600',
   },
   trainsContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
+    paddingHorizontal: 16, // Reduced from 24
+    paddingBottom: 12, // Reduced from 16
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
-    marginTop: 8,
-    paddingTop: 16,
+    marginTop: 6, // Reduced from 8
+    paddingTop: 12, // Reduced from 16
   },
   trainsText: {
     fontWeight: '500',
@@ -396,17 +396,17 @@ const screenStyles = StyleSheet.create({
   },
   directionToggleContainer: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 12, // Reduced from 16
     backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    margin: 16,
+    borderRadius: 6, // Reduced from 8
+    margin: 12, // Reduced from 16
   },
   directionToggle: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    marginHorizontal: 4,
+    paddingVertical: 8, // Reduced from 12
+    paddingHorizontal: 12, // Reduced from 16
+    borderRadius: 4, // Reduced from 6
+    marginHorizontal: 3, // Reduced from 4
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -426,14 +426,14 @@ const screenStyles = StyleSheet.create({
   lineRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 16, // Reduced from 24
+    paddingVertical: 8, // Reduced from 12
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
   trainLogoContainer: {
-    marginRight: 16,
-    width: 50,
+    marginRight: 12, // Reduced from 16
+    width: 40, // Reduced from 50
     alignItems: 'flex-start',
   },
   timePillsContainer: {

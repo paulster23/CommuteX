@@ -2,7 +2,7 @@
 // Neumorphic design with clean, minimal aesthetics
 
 import { StyleSheet } from 'react-native';
-import { spacing, borderRadius, typography, lightTheme, darkTheme, shadows } from './theme';
+import { spacing, borderRadius, typography, lightTheme, darkTheme, shadows, compactSpacing, compactTypography } from './theme';
 import type { Theme } from './theme';
 
 // Neumorphic card styles
@@ -273,6 +273,117 @@ export const createStateStyles = (theme: Theme) => StyleSheet.create({
   },
 });
 
+// Compact header styles for iPhone 13 mini
+export const createCompactHeaderStyles = (theme: Theme) => StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: compactSpacing.md, // Reduced from lg
+    paddingTop: compactSpacing.lg, // Reduced from xl
+    paddingBottom: compactSpacing.md, // Reduced from lg
+    backgroundColor: theme.colors.background,
+  },
+  title: {
+    ...compactTypography.heading,
+    color: theme.colors.text,
+    marginBottom: compactSpacing.xs,
+  },
+  subtitle: {
+    ...compactTypography.caption,
+    color: theme.colors.textSecondary,
+  },
+});
+
+// Compact route card styles for iPhone 13 mini
+export const createCompactRouteCardStyles = (theme: Theme) => StyleSheet.create({
+  container: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: borderRadius.md, // Reduced from lg
+    marginBottom: compactSpacing.md,
+    overflow: 'hidden',
+    ...theme.shadows.card,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: compactSpacing.md, // Reduced from lg
+    paddingBottom: compactSpacing.sm, // Reduced from md
+  },
+  mainInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: compactSpacing.sm, // Reduced from md
+  },
+  iconContainer: {
+    minWidth: 32, // Reduced from 40
+    height: 32, // Reduced from 40
+    borderRadius: borderRadius.sm, // Reduced from md
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: compactSpacing.sm, // Reduced from md
+    ...theme.shadows.cardPressed,
+  },
+  textInfo: {
+    flex: 1,
+  },
+  title: {
+    ...compactTypography.subheading,
+    color: theme.colors.text,
+    marginBottom: compactSpacing.xs,
+  },
+  subtitle: {
+    ...compactTypography.caption,
+    color: theme.colors.textSecondary,
+  },
+  timeInfo: {
+    alignItems: 'flex-end',
+  },
+  arrivalTime: {
+    ...compactTypography.subheading,
+    color: theme.colors.text,
+    marginBottom: compactSpacing.xs,
+  },
+  duration: {
+    ...compactTypography.caption,
+    color: theme.colors.textSecondary,
+    marginBottom: compactSpacing.sm,
+  },
+  countdownContainer: {
+    paddingHorizontal: compactSpacing.md,
+    paddingBottom: compactSpacing.sm, // Reduced from md
+  },
+  countdownText: {
+    ...compactTypography.captionMedium,
+    color: theme.colors.primary,
+    marginBottom: compactSpacing.sm,
+  },
+  countdownBar: {
+    height: 3,
+    backgroundColor: theme.colors.borderLight,
+    borderRadius: borderRadius.sm,
+    overflow: 'hidden',
+  },
+  countdownProgress: {
+    height: '100%',
+    borderRadius: borderRadius.sm,
+  },
+  expandButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: compactSpacing.sm, // Reduced from md
+    backgroundColor: theme.colors.surfaceSecondary,
+  },
+  expandText: {
+    ...compactTypography.captionMedium,
+    color: theme.colors.primary,
+    marginRight: compactSpacing.xs,
+  },
+});
+
 // Helper function to get theme-specific styles
 export const getThemeStyles = (isDarkMode: boolean) => {
   const theme = isDarkMode ? darkTheme : lightTheme;
@@ -285,6 +396,22 @@ export const getThemeStyles = (isDarkMode: boolean) => {
     header: createHeaderStyles(theme),
     statusBar: createStatusBarStyles(theme),
     routeCard: createRouteCardStyles(theme),
+    state: createStateStyles(theme),
+  };
+};
+
+// Helper function to get compact theme-specific styles for iPhone 13 mini
+export const getCompactThemeStyles = (isDarkMode: boolean) => {
+  const theme = isDarkMode ? darkTheme : lightTheme;
+  
+  return {
+    theme,
+    card: (isPressed?: boolean, isElevated?: boolean) => createCardStyles(theme, isPressed, isElevated),
+    button: createButtonStyles(theme),
+    indicator: createIndicatorStyles(theme),
+    header: createCompactHeaderStyles(theme),
+    statusBar: createStatusBarStyles(theme),
+    routeCard: createCompactRouteCardStyles(theme),
     state: createStateStyles(theme),
   };
 };

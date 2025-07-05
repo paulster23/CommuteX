@@ -260,8 +260,8 @@ describe('HelpScreen', () => {
     render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
-      expect(screen.getByText('Northbound')).toBeTruthy();
-      expect(screen.getByText('Southbound')).toBeTruthy();
+      expect(screen.getByText('North')).toBeTruthy();
+      expect(screen.getByText('South')).toBeTruthy();
     });
   });
 
@@ -365,8 +365,8 @@ describe('HelpScreen', () => {
     const { getByText } = render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
-      expect(getByText('Northbound')).toBeTruthy();
-      expect(getByText('Southbound')).toBeTruthy();
+      expect(getByText('North')).toBeTruthy();
+      expect(getByText('South')).toBeTruthy();
     });
 
     // Should show departure data initially
@@ -427,7 +427,7 @@ describe('HelpScreen', () => {
     });
 
     // Click southbound toggle
-    const southboundButton = getByText('Southbound');
+    const southboundButton = getByText('South');
     fireEvent.press(southboundButton);
 
     // Wait for southbound data to load (should be different times)
@@ -461,6 +461,28 @@ describe('HelpScreen', () => {
       expect(screen.getByTestId('time-pill-F-0')).toBeTruthy(); // 2m
       expect(screen.getByTestId('time-pill-F-1')).toBeTruthy(); // 9m
       expect(screen.getByTestId('time-pill-F-2')).toBeTruthy(); // 16m
+    });
+  });
+
+  test('shouldUseCompactLayoutForMobile', async () => {
+    // Red: Test that Help screen uses compact layout for iPhone 13 mini
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
+    
+    await waitFor(() => {
+      // Should use compact card padding (12px instead of 16px)
+      const helpTitle = screen.getByText('Help & Location');
+      expect(helpTitle).toBeTruthy();
+      
+      // Should use compact margins between sections
+      expect(screen.getByText('Your Location')).toBeTruthy();
+      expect(screen.getByText('Nearest Subway Station')).toBeTruthy();
     });
   });
 });

@@ -10,6 +10,16 @@ export const spacing = {
   xxl: 48,
 } as const;
 
+// Compact spacing for iPhone 13 mini (360 x 780)
+export const compactSpacing = {
+  xs: 2,
+  sm: 6,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
+} as const;
+
 export const borderRadius = {
   sm: 8,
   md: 12,
@@ -59,6 +69,50 @@ export const typography = {
     fontSize: 12,
     fontWeight: '600' as const,
     lineHeight: 16,
+  },
+} as const;
+
+// Compact typography for iPhone 13 mini (360 x 780)
+export const compactTypography = {
+  heading: {
+    fontSize: 24,
+    fontWeight: '700' as const,
+    letterSpacing: -0.5,
+  },
+  subheading: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    letterSpacing: -0.3,
+  },
+  body: {
+    fontSize: 14,
+    fontWeight: '400' as const,
+    lineHeight: 20,
+  },
+  bodyMedium: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+    lineHeight: 20,
+  },
+  caption: {
+    fontSize: 12,
+    fontWeight: '400' as const,
+    lineHeight: 16,
+  },
+  captionMedium: {
+    fontSize: 12,
+    fontWeight: '500' as const,
+    lineHeight: 16,
+  },
+  small: {
+    fontSize: 10,
+    fontWeight: '400' as const,
+    lineHeight: 14,
+  },
+  smallMedium: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    lineHeight: 14,
   },
 } as const;
 

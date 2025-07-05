@@ -23,10 +23,10 @@ export function TrainTimePill({ line, time, index }: TrainTimePillProps) {
 
 const styles = StyleSheet.create({
   pill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 8,
+    paddingHorizontal: 10, // Reduced from 12 for wider pills
+    paddingVertical: 4, // Reduced from 6 for compact density
+    borderRadius: 12, // Reduced from 16 for compact appearance
+    marginRight: 6, // Reduced from 8 for wider pills
     marginBottom: 4,
     minWidth: 40,
     alignItems: 'center',
@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
   },
   pillText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12, // Reduced from 14 for iPhone 13 mini
     fontWeight: '600',
   },
 });
