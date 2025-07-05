@@ -1,14 +1,20 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useColorScheme } from 'react-native';
 import { Sun, Moon, Settings, MapPin } from 'lucide-react-native';
 import { HomeScreen } from '../screens/HomeScreen';
 import { AfternoonScreen } from '../screens/AfternoonScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { HelpScreen } from '../screens/HelpScreen';
+import { getThemeStyles } from '../design/components';
 
 const Tab = createBottomTabNavigator();
 
 export function AppNavigator() {
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
+  const styles = getThemeStyles(isDarkMode);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -27,19 +33,19 @@ export function AppNavigator() {
 
           return IconComponent ? <IconComponent size={size} color={color} /> : null;
         },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarActiveTintColor: styles.theme.colors.primary,
+        tabBarInactiveTintColor: styles.theme.colors.textTertiary,
         headerShown: false, // PWA optimization - use screen space efficiently
         tabBarStyle: {
           paddingBottom: 16, // Increased padding to prevent text cutoff
           paddingTop: 8,
           height: 80, // Increased height to accommodate text labels
-          backgroundColor: '#FFFFFF',
+          backgroundColor: styles.theme.colors.surface,
           borderTopWidth: 1,
-          borderTopColor: '#E5E5E7',
-          shadowColor: '#000',
+          borderTopColor: styles.theme.colors.border,
+          shadowColor: isDarkMode ? '#000' : '#000',
           shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
+          shadowOpacity: isDarkMode ? 0.3 : 0.1,
           shadowRadius: 4,
           elevation: 8,
         },

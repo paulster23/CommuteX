@@ -1,34 +1,38 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getThemeStyles } from '../design/components';
 
 export function RoutesScreen() {
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
+  const styles = getThemeStyles(isDarkMode);
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Route Planning</Text>
-          <Text style={styles.subtitle}>Plan your commute with multiple options</Text>
+    <SafeAreaView style={[localStyles.container, { backgroundColor: styles.theme.colors.background }]} edges={['top']}>
+      <ScrollView style={localStyles.content}>
+        <View style={localStyles.header}>
+          <Text style={[localStyles.title, { color: styles.theme.colors.text }]}>Route Planning</Text>
+          <Text style={[localStyles.subtitle, { color: styles.theme.colors.textSecondary }]}>Plan your commute with multiple options</Text>
         </View>
         
-        <View style={styles.placeholder}>
-          <Text style={styles.placeholderText}>
+        <View style={[localStyles.placeholder, { backgroundColor: styles.theme.colors.surface }]}>
+          <Text style={[localStyles.placeholderText, { color: styles.theme.colors.text }]}>
             🚇 Route planning features coming soon:
           </Text>
-          <Text style={styles.featureText}>• Alternative route suggestions</Text>
-          <Text style={styles.featureText}>• Custom destination planning</Text>
-          <Text style={styles.featureText}>• Saved routes and favorites</Text>
-          <Text style={styles.featureText}>• Time-based route optimization</Text>
+          <Text style={[localStyles.featureText, { color: styles.theme.colors.textSecondary }]}>• Alternative route suggestions</Text>
+          <Text style={[localStyles.featureText, { color: styles.theme.colors.textSecondary }]}>• Custom destination planning</Text>
+          <Text style={[localStyles.featureText, { color: styles.theme.colors.textSecondary }]}>• Saved routes and favorites</Text>
+          <Text style={[localStyles.featureText, { color: styles.theme.colors.textSecondary }]}>• Time-based route optimization</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const localStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   content: {
     flex: 1,
@@ -40,15 +44,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1C1C1E',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6C6C70',
   },
   placeholder: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 24,
     marginBottom: 20,
@@ -56,12 +57,10 @@ const styles = StyleSheet.create({
   placeholderText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1C1C1E',
     marginBottom: 16,
   },
   featureText: {
     fontSize: 16,
-    color: '#6C6C70',
     marginBottom: 8,
     paddingLeft: 8,
   },

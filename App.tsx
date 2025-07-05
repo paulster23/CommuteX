@@ -1,11 +1,15 @@
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, Platform } from 'react-native';
+import { StyleSheet, View, Platform, useColorScheme } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './src/components/Navigation';
+import { getThemeStyles } from './src/design/components';
 
 export default function App() {
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
+  const styles = getThemeStyles(isDarkMode);
   useEffect(() => {
     // PWA standalone optimizations
     if (Platform.OS === 'web') {
@@ -32,18 +36,17 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <View style={styles.container}>
+        <View style={[localStyles.container, { backgroundColor: styles.theme.colors.background }]}>
           <AppNavigator />
-          <StatusBar style="light" backgroundColor="#007AFF" />
+          <StatusBar style={isDarkMode ? "light" : "dark"} backgroundColor={styles.theme.colors.primary} />
         </View>
       </NavigationContainer>
     </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
+const localStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
 });

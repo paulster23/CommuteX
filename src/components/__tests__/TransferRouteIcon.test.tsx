@@ -41,8 +41,12 @@ describe('TransferRouteIcon', () => {
     // Check text color is white
     const fText = getByText('F');
     const cText = getByText('C');
-    expect(fText.props.style).toMatchObject({ color: '#fff' });
-    expect(cText.props.style).toMatchObject({ color: '#fff' });
+    expect(fText.props.style).toEqual(expect.arrayContaining([
+      expect.objectContaining({ color: '#FFFFFF' })
+    ]));
+    expect(cText.props.style).toEqual(expect.arrayContaining([
+      expect.objectContaining({ color: '#FFFFFF' })
+    ]));
   });
 
   it('shouldUseSquaredShapeForBothSingleAndMultiStepTrips', () => {

@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, Bell, MapPin, Clock, Info, Trash2 } from 'lucide-react-native';
 import { CacheUtility } from '../services/CacheUtility';
 import { ClearCacheModal } from '../components/ClearCacheModal';
+import { getThemeStyles } from '../design/components';
 
 export function SettingsScreen() {
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
+  const styles = getThemeStyles(isDarkMode);
+  
   const [isClearing, setIsClearing] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
 
@@ -213,65 +218,66 @@ export function SettingsScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Settings</Text>
-          <Text style={styles.subtitle}>Customize your CommuteX experience</Text>
+    <SafeAreaView style={[localStyles.container, { backgroundColor: styles.theme.colors.background }]} edges={['top']}>
+      <ScrollView style={localStyles.content}>
+        <View style={localStyles.header}>
+          <Text style={[localStyles.title, { color: styles.theme.colors.text }]}>Settings</Text>
+          <Text style={[localStyles.subtitle, { color: styles.theme.colors.textSecondary }]}>Customize your CommuteX experience</Text>
         </View>
         
-        <View style={styles.section}>
+        <View style={[localStyles.section, { backgroundColor: styles.theme.colors.surface }]}>
           {settingsOptions.map((option, index) => (
             <TouchableOpacity 
               key={index} 
               style={[
-                styles.settingItem,
-                index === settingsOptions.length - 1 && styles.lastItem
+                localStyles.settingItem,
+                { borderBottomColor: styles.theme.colors.border },
+                index === settingsOptions.length - 1 && localStyles.lastItem
               ]}
               activeOpacity={0.7}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.iconContainer}>
-                  <option.icon size={24} color="#007AFF" />
+              <View style={localStyles.settingContent}>
+                <View style={[localStyles.iconContainer, { backgroundColor: styles.theme.colors.surfaceSecondary }]}>
+                  <option.icon size={24} color={styles.theme.colors.primary} />
                 </View>
-                <View style={styles.textContainer}>
-                  <Text style={styles.settingTitle}>{option.title}</Text>
-                  <Text style={styles.settingSubtitle}>{option.subtitle}</Text>
+                <View style={localStyles.textContainer}>
+                  <Text style={[localStyles.settingTitle, { color: styles.theme.colors.text }]}>{option.title}</Text>
+                  <Text style={[localStyles.settingSubtitle, { color: styles.theme.colors.textSecondary }]}>{option.subtitle}</Text>
                 </View>
-                <ChevronRight size={20} color="#C7C7CC" />
+                <ChevronRight size={20} color={styles.theme.colors.textTertiary} />
               </View>
             </TouchableOpacity>
           ))}
         </View>
 
         {/* Cache Management Section */}
-        <View style={styles.section}>
+        <View style={[localStyles.section, { backgroundColor: styles.theme.colors.surface }]}>
           <TouchableOpacity 
-            style={styles.settingItem}
+            style={localStyles.settingItem}
             activeOpacity={0.7}
             onPress={handleClearCache}
             disabled={isClearing}
           >
-            <View style={styles.settingContent}>
-              <View style={[styles.iconContainer, { backgroundColor: '#FFEBEE' }]}>
-                <Trash2 size={24} color="#F44336" />
+            <View style={localStyles.settingContent}>
+              <View style={[localStyles.iconContainer, { backgroundColor: isDarkMode ? '#4A2F2A' : '#FFEBEE' }]}>
+                <Trash2 size={24} color={styles.theme.colors.error} />
               </View>
-              <View style={styles.textContainer}>
-                <Text style={styles.settingTitle}>
+              <View style={localStyles.textContainer}>
+                <Text style={[localStyles.settingTitle, { color: styles.theme.colors.text }]}>
                   {isClearing ? 'Clearing Cache...' : 'Clear Cache'}
                 </Text>
-                <Text style={styles.settingSubtitle}>
+                <Text style={[localStyles.settingSubtitle, { color: styles.theme.colors.textSecondary }]}>
                   Clear all cached data and refresh app
                 </Text>
               </View>
-              <ChevronRight size={20} color="#C7C7CC" />
+              <ChevronRight size={20} color={styles.theme.colors.textTertiary} />
             </View>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.pwaTip}>
-          <Text style={styles.tipTitle}>💡 PWA Tip</Text>
-          <Text style={styles.tipText}>
+        <View style={[localStyles.pwaTip, { backgroundColor: isDarkMode ? '#1A2F3A' : '#E3F2FD' }]}>
+          <Text style={[localStyles.tipTitle, { color: isDarkMode ? '#4FC3F7' : '#1565C0' }]}>💡 PWA Tip</Text>
+          <Text style={[localStyles.tipText, { color: isDarkMode ? '#29B6F6' : '#1976D2' }]}>
             Install CommuteX to your home screen for the best experience! 
             Look for the "Add to Home Screen" option in your browser menu.
           </Text>
@@ -289,10 +295,9 @@ export function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const localStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   content: {
     flex: 1,
@@ -304,22 +309,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1C1C1E',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6C6C70',
   },
   section: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     marginBottom: 20,
     overflow: 'hidden',
   },
   settingItem: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
   },
   lastItem: {
     borderBottomWidth: 0,
@@ -333,7 +334,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F2F2F7',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -344,15 +344,12 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1C1C1E',
     marginBottom: 2,
   },
   settingSubtitle: {
     fontSize: 15,
-    color: '#6C6C70',
   },
   pwaTip: {
-    backgroundColor: '#E3F2FD',
     borderRadius: 12,
     padding: 20,
     marginTop: 10,
@@ -360,12 +357,10 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1565C0',
     marginBottom: 8,
   },
   tipText: {
     fontSize: 16,
-    color: '#1976D2',
     lineHeight: 22,
   },
 });

@@ -217,7 +217,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                 </View>
                 <View style={styles.routeCard.textInfo}>
                   <Text style={styles.routeCard.title}>Nearest Subway Station</Text>
-                  <Text style={[styles.routeCard.subtitle, screenStyles.stationName]}>
+                  <Text style={[styles.routeCard.subtitle, screenStyles.stationName, { color: styles.theme.colors.text }]}>
                     {locationState.nearestStation.station.name}
                   </Text>
                 </View>
@@ -230,8 +230,8 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
             </View>
             
             {/* Train Lines */}
-            <View style={screenStyles.trainsContainer}>
-              <Text style={[styles.routeCard.subtitle, screenStyles.trainsText]}>
+            <View style={[screenStyles.trainsContainer, { borderTopColor: styles.theme.colors.border }]}>
+              <Text style={[styles.routeCard.subtitle, screenStyles.trainsText, { color: styles.theme.colors.textSecondary }]}>
                 {formatTrainLines(locationState.nearestStation.station.lines)}
               </Text>
             </View>
@@ -241,17 +241,19 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
         {/* Direction Toggle */}
         {locationState.nearestStation && (
           <View style={[styles.routeCard.container, screenStyles.card]}>
-            <View style={screenStyles.directionToggleContainer}>
+            <View style={[screenStyles.directionToggleContainer, { backgroundColor: styles.theme.colors.surfaceSecondary }]}>
               <TouchableOpacity
                 style={[
                   screenStyles.directionToggle,
-                  direction === 'northbound' && screenStyles.directionToggleActive
+                  { backgroundColor: styles.theme.colors.surface, borderColor: styles.theme.colors.border },
+                  direction === 'northbound' && [screenStyles.directionToggleActive, { backgroundColor: styles.theme.colors.primary, borderColor: styles.theme.colors.primary }]
                 ]}
                 onPress={() => handleDirectionChange('northbound')}
               >
                 <Text style={[
                   screenStyles.directionToggleText,
-                  direction === 'northbound' && screenStyles.directionToggleTextActive
+                  { color: styles.theme.colors.textSecondary },
+                  direction === 'northbound' && [screenStyles.directionToggleTextActive, { color: '#FFFFFF' }]
                 ]}>
                   North
                 </Text>
@@ -259,13 +261,15 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
               <TouchableOpacity
                 style={[
                   screenStyles.directionToggle,
-                  direction === 'southbound' && screenStyles.directionToggleActive
+                  { backgroundColor: styles.theme.colors.surface, borderColor: styles.theme.colors.border },
+                  direction === 'southbound' && [screenStyles.directionToggleActive, { backgroundColor: styles.theme.colors.primary, borderColor: styles.theme.colors.primary }]
                 ]}
                 onPress={() => handleDirectionChange('southbound')}
               >
                 <Text style={[
                   screenStyles.directionToggleText,
-                  direction === 'southbound' && screenStyles.directionToggleTextActive
+                  { color: styles.theme.colors.textSecondary },
+                  direction === 'southbound' && [screenStyles.directionToggleTextActive, { color: '#FFFFFF' }]
                 ]}>
                   South
                 </Text>
@@ -293,7 +297,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
 
             {/* Departures by Line - Horizontal Layout */}
             {Object.entries(departureState.departures).map(([line, departures]) => (
-              <View key={line} style={screenStyles.lineRow}>
+              <View key={line} style={[screenStyles.lineRow, { borderTopColor: styles.theme.colors.border }]}>
                 <View style={screenStyles.trainLogoContainer}>
                   <View testID={`train-logo-${line}`}>
                     <TransferRouteIcon routeLine={line} />
@@ -376,7 +380,7 @@ const screenStyles = StyleSheet.create({
   },
   stationName: {
     fontWeight: '600',
-    color: '#1F2937',
+    // Color now applied inline using theme
   },
   distance: {
     fontSize: 14,
@@ -386,18 +390,16 @@ const screenStyles = StyleSheet.create({
     paddingHorizontal: 16, // Reduced from 24
     paddingBottom: 12, // Reduced from 16
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
     marginTop: 6, // Reduced from 8
     paddingTop: 12, // Reduced from 16
   },
   trainsText: {
     fontWeight: '500',
-    color: '#6B7280',
+    // Color now applied inline using theme
   },
   directionToggleContainer: {
     flexDirection: 'row',
     padding: 12, // Reduced from 16
-    backgroundColor: '#F9FAFB',
     borderRadius: 6, // Reduced from 8
     margin: 12, // Reduced from 16
   },
@@ -407,21 +409,17 @@ const screenStyles = StyleSheet.create({
     paddingHorizontal: 12, // Reduced from 16
     borderRadius: 4, // Reduced from 6
     marginHorizontal: 3, // Reduced from 4
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   directionToggleActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    // Colors now applied inline using theme
   },
   directionToggleText: {
     textAlign: 'center',
     fontWeight: '600',
-    color: '#6B7280',
   },
   directionToggleTextActive: {
-    color: '#FFFFFF',
+    // Colors now applied inline using theme
   },
   lineRow: {
     flexDirection: 'row',
@@ -429,7 +427,7 @@ const screenStyles = StyleSheet.create({
     paddingHorizontal: 16, // Reduced from 24
     paddingVertical: 8, // Reduced from 12
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    // borderTopColor now applied inline using theme
   },
   trainLogoContainer: {
     marginRight: 12, // Reduced from 16

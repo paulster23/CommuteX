@@ -71,10 +71,10 @@ describe('TrainTimePill', () => {
     const { getByText } = render(<TrainTimePill line="F" time="5m" index={0} />);
     
     const text = getByText('5m');
-    expect(text.props.style).toEqual(
+    expect(text.props.style).toEqual(expect.arrayContaining([
       expect.objectContaining({
         fontSize: 12 // Reduced from 14
       })
-    );
+    ]));
   });
 });

@@ -1,23 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, useColorScheme } from 'react-native';
 import { Clock, Navigation, Users, MapPin } from 'lucide-react-native';
 import { RouteStep, DataSourceType } from '../services/RealMTAService';
+import { getThemeStyles } from '../design/components';
 
 interface RouteStepsDisplayProps {
   steps: RouteStep[];
   isExpanded: boolean;
 }
 
-const getDataSourceIndicator = (dataSource: DataSourceType) => {
+const getDataSourceIndicator = (dataSource: DataSourceType, theme: any) => {
   switch (dataSource) {
     case 'realtime':
-      return { color: '#34C759', label: 'Live GTFS Data' }; // Green
+      return { color: theme.colors.success, label: 'Live GTFS Data' };
     case 'estimate':
-      return { color: '#FF9500', label: 'Estimated' }; // Yellow/Orange
+      return { color: theme.colors.warning, label: 'Estimated' };
     case 'fixed':
-      return { color: '#FF3B30', label: 'Fixed Data' }; // Red
+      return { color: theme.colors.error, label: 'Fixed Data' };
     default:
-      return { color: '#8E8E93', label: 'Unknown' }; // Gray
+      return { color: theme.colors.textTertiary, label: 'Unknown' };
   }
 };
 
@@ -37,64 +38,68 @@ const getStepIcon = (type: RouteStep['type']) => {
 };
 
 export function RouteStepsDisplay({ steps, isExpanded }: RouteStepsDisplayProps) {
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
+  const styles = getThemeStyles(isDarkMode);
+
   if (!isExpanded || !steps || steps.length === 0) {
     return null;
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Route Breakdown</Text>
-        <View style={styles.legend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.dot, { backgroundColor: '#34C759' }]} />
-            <Text style={styles.legendText}>Live GTFS</Text>
+    <View style={[localStyles.container, { backgroundColor: styles.theme.colors.surfaceSecondary }]}>
+      <View style={localStyles.header}>
+        <Text style={[localStyles.headerTitle, { color: styles.theme.colors.text }]}>Route Breakdown</Text>
+        <View style={localStyles.legend}>
+          <View style={localStyles.legendItem}>
+            <View style={[localStyles.dot, { backgroundColor: styles.theme.colors.success }]} />
+            <Text style={[localStyles.legendText, { color: styles.theme.colors.textSecondary }]}>Live GTFS</Text>
           </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.dot, { backgroundColor: '#FF9500' }]} />
-            <Text style={styles.legendText}>Estimated</Text>
+          <View style={localStyles.legendItem}>
+            <View style={[localStyles.dot, { backgroundColor: styles.theme.colors.warning }]} />
+            <Text style={[localStyles.legendText, { color: styles.theme.colors.textSecondary }]}>Estimated</Text>
           </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.dot, { backgroundColor: '#FF3B30' }]} />
-            <Text style={styles.legendText}>Fixed</Text>
+          <View style={localStyles.legendItem}>
+            <View style={[localStyles.dot, { backgroundColor: styles.theme.colors.error }]} />
+            <Text style={[localStyles.legendText, { color: styles.theme.colors.textSecondary }]}>Fixed</Text>
           </View>
         </View>
       </View>
       
       {steps.map((step, index) => {
-        const indicator = getDataSourceIndicator(step.dataSource);
+        const indicator = getDataSourceIndicator(step.dataSource, styles.theme);
         const IconComponent = getStepIcon(step.type);
         
         return (
-          <View key={index} style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <View style={styles.stepIconContainer}>
-                <IconComponent size={16} color="#6C6C70" />
+          <View key={index} style={localStyles.stepContainer}>
+            <View style={localStyles.stepHeader}>
+              <View style={[localStyles.stepIconContainer, { backgroundColor: styles.theme.colors.border }]}>
+                <IconComponent size={16} color={styles.theme.colors.textSecondary} />
               </View>
-              <View style={styles.stepContent}>
-                <View style={styles.stepTitleRow}>
-                  <Text style={styles.stepDescription}>{step.description}</Text>
-                  <View style={styles.dataSourceContainer}>
-                    <View style={[styles.dataSourceDot, { backgroundColor: indicator.color }]} />
-                    <Text style={styles.stepDuration}>{step.duration} min</Text>
+              <View style={localStyles.stepContent}>
+                <View style={localStyles.stepTitleRow}>
+                  <Text style={[localStyles.stepDescription, { color: styles.theme.colors.text }]}>{step.description}</Text>
+                  <View style={localStyles.dataSourceContainer}>
+                    <View style={[localStyles.dataSourceDot, { backgroundColor: indicator.color }]} />
+                    <Text style={[localStyles.stepDuration, { color: styles.theme.colors.primary }]}>{step.duration} min</Text>
                   </View>
                 </View>
                 
                 {step.line && (
-                  <View style={styles.lineContainer}>
-                    <View style={[styles.lineBadge, getLineColor(step.line)]}>
-                      <Text style={styles.lineText}>{step.line}</Text>
+                  <View style={localStyles.lineContainer}>
+                    <View style={[localStyles.lineBadge, getLineColor(step.line)]}>
+                      <Text style={[localStyles.lineText, { color: getLineColor(step.line).color }]}>{step.line}</Text>
                     </View>
                   </View>
                 )}
                 
-                <Text style={styles.dataSourceLabel}>{indicator.label}</Text>
+                <Text style={[localStyles.dataSourceLabel, { color: styles.theme.colors.textSecondary }]}>{indicator.label}</Text>
               </View>
             </View>
             
             {index < steps.length - 1 && (
-              <View style={styles.connector}>
-                <View style={styles.connectorLine} />
+              <View style={localStyles.connector}>
+                <View style={[localStyles.connectorLine, { backgroundColor: styles.theme.colors.border }]} />
               </View>
             )}
           </View>
@@ -124,10 +129,9 @@ const getLineColor = (line: string) => {
   return colors[line] || { backgroundColor: '#8E8E93', color: '#FFFFFF' };
 };
 
-const styles = StyleSheet.create({
+const localStyles = StyleSheet.create({
   container: {
     marginTop: 16,
-    backgroundColor: '#F8F9FA',
     borderRadius: 12,
     padding: 16,
   },
@@ -137,7 +141,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1C1C1E',
     marginBottom: 8,
   },
   legend: {
@@ -151,7 +154,6 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
-    color: '#6C6C70',
   },
   dot: {
     width: 8,
@@ -170,7 +172,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#E5E5E7',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -187,7 +188,6 @@ const styles = StyleSheet.create({
   stepDescription: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#1C1C1E',
     flex: 1,
     marginRight: 8,
   },
@@ -204,7 +204,6 @@ const styles = StyleSheet.create({
   stepDuration: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#007AFF',
   },
   lineContainer: {
     marginBottom: 4,
@@ -223,7 +222,6 @@ const styles = StyleSheet.create({
   },
   dataSourceLabel: {
     fontSize: 12,
-    color: '#6C6C70',
     marginTop: 2,
   },
   connector: {
@@ -237,6 +235,5 @@ const styles = StyleSheet.create({
   connectorLine: {
     width: 2,
     height: '100%',
-    backgroundColor: '#E5E5E7',
   },
 });

@@ -2,6 +2,36 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { colors } from '../design/theme';
 
+const getLineColors = (line: string) => {
+  const colorMap: { [key: string]: { backgroundColor: string; color: string } } = {
+    'F': { backgroundColor: colors.subway.F, color: '#FFFFFF' },
+    'R': { backgroundColor: colors.subway.R, color: '#000000' },
+    'Q': { backgroundColor: colors.subway.Q, color: '#000000' },
+    'N': { backgroundColor: colors.subway.N, color: '#000000' },
+    'W': { backgroundColor: colors.subway.W, color: '#000000' },
+    'A': { backgroundColor: colors.subway.A, color: '#FFFFFF' },
+    'C': { backgroundColor: colors.subway.C, color: '#FFFFFF' },
+    'E': { backgroundColor: colors.subway.E, color: '#FFFFFF' },
+    'G': { backgroundColor: colors.subway.G, color: '#FFFFFF' },
+    'L': { backgroundColor: colors.subway.L, color: '#000000' },
+    '4': { backgroundColor: colors.subway['4'], color: '#FFFFFF' },
+    '5': { backgroundColor: colors.subway['5'], color: '#FFFFFF' },
+    '6': { backgroundColor: colors.subway['6'], color: '#FFFFFF' },
+    'B': { backgroundColor: colors.subway.B, color: '#FFFFFF' },
+    'D': { backgroundColor: colors.subway.D, color: '#FFFFFF' },
+    'M': { backgroundColor: colors.subway.M, color: '#FFFFFF' },
+    'J': { backgroundColor: colors.subway.J, color: '#FFFFFF' },
+    'Z': { backgroundColor: colors.subway.Z, color: '#FFFFFF' },
+    '1': { backgroundColor: colors.subway['1'], color: '#FFFFFF' },
+    '2': { backgroundColor: colors.subway['2'], color: '#FFFFFF' },
+    '3': { backgroundColor: colors.subway['3'], color: '#FFFFFF' },
+    '7': { backgroundColor: colors.subway['7'], color: '#FFFFFF' },
+    'S': { backgroundColor: colors.subway.S, color: '#FFFFFF' },
+  };
+  
+  return colorMap[line] || { backgroundColor: '#666', color: '#FFFFFF' };
+};
+
 interface TransferRouteIconProps {
   routeLine: string;
 }
@@ -11,13 +41,14 @@ export function TransferRouteIcon({ routeLine }: TransferRouteIconProps) {
   
   if (!isTransfer) {
     // Single route - use same container structure for consistency
+    const lineColors = getLineColors(routeLine);
     return (
       <View style={styles.singleRouteContainer}>
         <View 
           testID="subway-icon"
-          style={[styles.singleRouteIcon, { backgroundColor: colors.subway[routeLine as keyof typeof colors.subway] || '#666' }]}
+          style={[styles.singleRouteIcon, { backgroundColor: lineColors.backgroundColor }]}
         >
-          <Text style={styles.singleRouteIconText}>{routeLine}</Text>
+          <Text style={[styles.singleRouteIconText, { color: lineColors.color }]}>{routeLine}</Text>
         </View>
       </View>
     );
@@ -31,19 +62,22 @@ export function TransferRouteIcon({ routeLine }: TransferRouteIconProps) {
   
   return (
     <View style={containerStyle}>
-      {lines.map((line, index) => (
-        <View 
-          key={index}
-          testID="subway-icon"
-          style={[
-            styles.subwayIcon, 
-            index > 0 && styles.secondIcon,
-            { backgroundColor: colors.subway[line as keyof typeof colors.subway] || '#666' }
-          ]}
-        >
-          <Text testID={`subway-icon-${line}`} style={styles.subwayIconText}>{line}</Text>
-        </View>
-      ))}
+      {lines.map((line, index) => {
+        const lineColors = getLineColors(line);
+        return (
+          <View 
+            key={index}
+            testID="subway-icon"
+            style={[
+              styles.subwayIcon, 
+              index > 0 && styles.secondIcon,
+              { backgroundColor: lineColors.backgroundColor }
+            ]}
+          >
+            <Text testID={`subway-icon-${line}`} style={[styles.subwayIconText, { color: lineColors.color }]}>{line}</Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -80,7 +114,6 @@ const styles = StyleSheet.create({
   singleRouteIconText: {
     fontSize: 16, // Original font size for single routes
     fontWeight: '700',
-    color: '#fff',
   },
   subwayIcon: {
     width: 28, // Smaller to fit multiple icons
@@ -95,6 +128,5 @@ const styles = StyleSheet.create({
   subwayIconText: {
     fontSize: 14, // Smaller font for better fit
     fontWeight: '700',
-    color: '#fff',
   },
 });

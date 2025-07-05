@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, useColorScheme } from 'react-native';
 import { AlertTriangle } from 'lucide-react-native';
+import { getThemeStyles } from '../design/components';
 
 interface ClearCacheModalProps {
   visible: boolean;
@@ -12,6 +13,10 @@ interface ClearCacheModalProps {
 export function ClearCacheModal({ visible, onConfirm, onCancel, isClearing = false }: ClearCacheModalProps) {
   console.log('[ClearCacheModal] Rendering modal, visible:', visible, 'isClearing:', isClearing);
   
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
+  const styles = getThemeStyles(isDarkMode);
+  
   return (
     <Modal
       visible={visible}
@@ -19,34 +24,34 @@ export function ClearCacheModal({ visible, onConfirm, onCancel, isClearing = fal
       animationType="fade"
       onRequestClose={onCancel}
     >
-      <View style={styles.overlay}>
-        <View style={styles.modal}>
-          <View style={styles.header}>
-            <View style={styles.iconContainer}>
-              <AlertTriangle size={24} color="#F44336" />
+      <View style={localStyles.overlay}>
+        <View style={[localStyles.modal, { backgroundColor: styles.theme.colors.surface }]}>
+          <View style={localStyles.header}>
+            <View style={[localStyles.iconContainer, { backgroundColor: isDarkMode ? '#4A2F2A' : '#FFEBEE' }]}>
+              <AlertTriangle size={24} color={styles.theme.colors.error} />
             </View>
-            <Text style={styles.title}>Clear Cache</Text>
+            <Text style={[localStyles.title, { color: styles.theme.colors.text }]}>Clear Cache</Text>
           </View>
           
-          <Text style={styles.message}>
+          <Text style={[localStyles.message, { color: styles.theme.colors.textSecondary }]}>
             This will clear all cached data including route information, service worker caches, and browser storage. The app will refresh with the latest data.
           </Text>
           
-          <View style={styles.buttonContainer}>
+          <View style={localStyles.buttonContainer}>
             <TouchableOpacity 
-              style={[styles.button, styles.cancelButton]} 
+              style={[localStyles.button, localStyles.cancelButton, { backgroundColor: styles.theme.colors.surfaceSecondary, borderColor: styles.theme.colors.border }]} 
               onPress={onCancel}
               disabled={isClearing}
             >
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={[localStyles.cancelText, { color: styles.theme.colors.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={[styles.button, styles.confirmButton, isClearing && styles.disabledButton]} 
+              style={[localStyles.button, localStyles.confirmButton, { backgroundColor: styles.theme.colors.error }, isClearing && localStyles.disabledButton]} 
               onPress={onConfirm}
               disabled={isClearing}
             >
-              <Text style={[styles.confirmText, isClearing && styles.disabledText]}>
+              <Text style={[localStyles.confirmText, isClearing && localStyles.disabledText]}>
                 {isClearing ? 'Clearing...' : 'Clear Cache'}
               </Text>
             </TouchableOpacity>
@@ -57,7 +62,7 @@ export function ClearCacheModal({ visible, onConfirm, onCancel, isClearing = fal
   );
 }
 
-const styles = StyleSheet.create({
+const localStyles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -66,7 +71,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modal: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 24,
     width: '100%',
@@ -89,7 +93,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFEBEE',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -97,11 +100,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1C1C1E',
   },
   message: {
     fontSize: 16,
-    color: '#6C6C70',
     lineHeight: 22,
     marginBottom: 24,
   },
@@ -119,12 +120,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelButton: {
-    backgroundColor: '#F2F2F7',
     borderWidth: 1,
-    borderColor: '#E5E5EA',
   },
   confirmButton: {
-    backgroundColor: '#F44336',
   },
   disabledButton: {
     backgroundColor: '#CCCCCC',
@@ -132,7 +130,6 @@ const styles = StyleSheet.create({
   cancelText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#6C6C70',
   },
   confirmText: {
     fontSize: 16,

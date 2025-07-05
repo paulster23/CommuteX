@@ -1,25 +1,29 @@
 import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CommuteApp } from '../components/CommuteApp';
+import { getThemeStyles } from '../design/components';
 
 export function HomeScreen() {
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
+  const styles = getThemeStyles(isDarkMode);
+
   return (
     <SafeAreaView 
-      style={styles.container} 
+      style={[localStyles.container, { backgroundColor: styles.theme.colors.background }]} 
       edges={Platform.OS === 'ios' ? ['top'] : ['top']}
     >
-      <View style={styles.content}>
+      <View style={localStyles.content}>
         <CommuteApp />
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const localStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   content: {
     flex: 1,
