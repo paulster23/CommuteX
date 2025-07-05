@@ -85,12 +85,12 @@ const styles = StyleSheet.create({
   subwayIcon: {
     width: 28, // Smaller to fit multiple icons
     height: 28,
-    borderRadius: 10,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   secondIcon: {
-    marginLeft: 3, // Reduced spacing for tighter layout
+    marginLeft: 4, // Proper spacing between icons
   },
   subwayIconText: {
     fontSize: 14, // Smaller font for better fit

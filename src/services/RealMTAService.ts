@@ -167,6 +167,11 @@ export class RealMTAService {
     destination: string,
     targetArrival: string
   ): Promise<Route[]> {
+    // Check if we're offline
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new Error('No internet connection available. Please check your connection and try again.');
+    }
+
     const config: RouteConfig = {
       direction: 'northbound',
       startStation: 'Carroll St',

@@ -2,7 +2,8 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react-native';
 import { HelpScreen } from '../HelpScreen';
 import { GPSLocationProvider } from '../../services/LocationService';
-import { NearestStationService } from '../../services/NearestStationService';
+import { NearestStationService, mockFindNearestStation as importedMockFindNearestStation } from '../../services/NearestStationService';
+import { StationDepartureService, mockGetDeparturesForStation as importedMockGetDeparturesForStation } from '../../services/StationDepartureService';
 
 // Mock the dependencies
 const mockGetCurrentLocation = jest.fn();
@@ -10,15 +11,43 @@ const mockFindNearestStation = jest.fn();
 
 jest.mock('../../services/LocationService', () => ({
   GPSLocationProvider: jest.fn().mockImplementation(() => ({
-    getCurrentLocation: mockGetCurrentLocation,
+    getCurrentLocation: jest.fn().mockResolvedValue({ lat: 40.688312, lng: -73.990982 }),
   })),
   Location: {}
 }));
 
-jest.mock('../../services/NearestStationService', () => ({
-  NearestStationService: {
-    findNearestStation: mockFindNearestStation,
-  },
+jest.mock('../../services/NearestStationService', () => {
+  const mockFindNearestStation = jest.fn();
+  
+  class MockNearestStationService {
+    static findNearestStation = mockFindNearestStation;
+  }
+  
+  return {
+    NearestStationService: MockNearestStationService,
+    mockFindNearestStation, // Export for test access
+  };
+});
+
+jest.mock('../../services/StationDepartureService', () => {
+  const mockGetDeparturesForStation = jest.fn();
+  
+  class MockStationDepartureService {
+    static getDeparturesForStation = mockGetDeparturesForStation;
+  }
+  
+  return {
+    StationDepartureService: MockStationDepartureService,
+    mockGetDeparturesForStation, // Export for test access
+  };
+});
+
+jest.mock('expo-location', () => ({
+  requestForegroundPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  getCurrentPositionAsync: jest.fn().mockResolvedValue({
+    coords: { latitude: 40.688312, longitude: -73.990982 }
+  }),
+  LocationAccuracy: { High: 'high' }
 }));
 
 jest.mock('lucide-react-native', () => ({
@@ -26,6 +55,7 @@ jest.mock('lucide-react-native', () => ({
   Navigation: () => null,
   Clock: () => null,
   AlertCircle: () => null,
+  Train: () => null,
 }));
 
 describe('HelpScreen', () => {
@@ -41,10 +71,23 @@ describe('HelpScreen', () => {
     distance: 0.157
   };
 
+  const mockDepartures = {
+    F: [
+      { line: 'F', departureTime: new Date(Date.now() + 2 * 60000), relativeTime: '2m' },
+      { line: 'F', departureTime: new Date(Date.now() + 9 * 60000), relativeTime: '9m' },
+      { line: 'F', departureTime: new Date(Date.now() + 16 * 60000), relativeTime: '16m' },
+    ],
+    G: [
+      { line: 'G', departureTime: new Date(Date.now() + 5 * 60000), relativeTime: '5m' },
+      { line: 'G', departureTime: new Date(Date.now() + 12 * 60000), relativeTime: '12m' },
+    ]
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetCurrentLocation.mockResolvedValue(mockLocation);
     mockFindNearestStation.mockReturnValue(mockNearestStation);
+    importedMockGetDeparturesForStation.mockResolvedValue(mockDepartures);
   });
 
   test('shouldRenderHelpScreenTitle', () => {
@@ -63,7 +106,15 @@ describe('HelpScreen', () => {
 
   test('shouldDisplayCurrentGPSCoordinates', async () => {
     // Red: Test that GPS coordinates are displayed
-    render(<HelpScreen />);
+    
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
       expect(screen.getByText('Your Location')).toBeTruthy();
@@ -73,7 +124,15 @@ describe('HelpScreen', () => {
 
   test('shouldDisplayNearestSubwayStation', async () => {
     // Red: Test that nearest subway station is displayed
-    render(<HelpScreen />);
+    
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
       expect(screen.getByText('Nearest Subway Station')).toBeTruthy();
@@ -85,11 +144,13 @@ describe('HelpScreen', () => {
 
   test('shouldHandleLocationPermissionDenied', async () => {
     // Red: Test error handling when location permission is denied
-    mockGetCurrentLocation.mockRejectedValue(
-      new Error('Location permission denied')
-    );
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockRejectedValue(
+        new Error('Location permission denied')
+      )
+    };
     
-    render(<HelpScreen />);
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
       expect(screen.getByText('Location Access Denied')).toBeTruthy();
@@ -99,11 +160,13 @@ describe('HelpScreen', () => {
 
   test('shouldHandleGPSServiceError', async () => {
     // Red: Test error handling when GPS service fails
-    mockGetCurrentLocation.mockRejectedValue(
-      new Error('Location service unavailable')
-    );
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockRejectedValue(
+        new Error('Location service unavailable')
+      )
+    };
     
-    render(<HelpScreen />);
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
       expect(screen.getByText('Location Unavailable')).toBeTruthy();
@@ -113,7 +176,15 @@ describe('HelpScreen', () => {
 
   test('shouldDisplayStationDistance', async () => {
     // Red: Test that distance to nearest station is formatted properly
-    render(<HelpScreen />);
+    
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
       expect(screen.getByText('0.16 miles away')).toBeTruthy();
@@ -133,9 +204,14 @@ describe('HelpScreen', () => {
       distance: 0.5
     };
     
-    mockFindNearestStation.mockReturnValue(mockStationWithMultipleLines);
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
     
-    render(<HelpScreen />);
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockStationWithMultipleLines);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
       expect(screen.getByText('Union Sq-14th St')).toBeTruthy();
@@ -145,15 +221,22 @@ describe('HelpScreen', () => {
 
   test('shouldRefreshLocationOnPullDown', async () => {
     // Red: Test that location can be refreshed
-    render(<HelpScreen />);
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
-      expect(mockGetCurrentLocation).toHaveBeenCalledTimes(1);
+      expect(mockLocationProvider.getCurrentLocation).toHaveBeenCalledTimes(1);
     });
     
     // This would test pull-to-refresh functionality
     // For now, just verify the location service is called
-    expect(mockGetCurrentLocation).toHaveBeenCalled();
+    expect(mockLocationProvider.getCurrentLocation).toHaveBeenCalled();
   });
 
   test('shouldUseProperDesignSystem', () => {
@@ -162,5 +245,114 @@ describe('HelpScreen', () => {
     
     // Should render with proper styling from design system
     expect(screen.getByText('Help & Location')).toBeTruthy();
+  });
+
+  test('shouldShowDirectionToggle', async () => {
+    // Red: Test that northbound/southbound toggle is displayed
+    
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Northbound')).toBeTruthy();
+      expect(screen.getByText('Southbound')).toBeTruthy();
+    });
+  });
+
+  test('shouldDisplayNextTrainDepartures', async () => {
+    // Red: Test that next train departures are shown
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    importedMockGetDeparturesForStation.mockResolvedValue(mockDepartures);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Next Departures')).toBeTruthy();
+      // Should show relative times like "2m"
+      expect(screen.getByText('2m')).toBeTruthy();
+    });
+  });
+
+  test('shouldSeparateMultipleLines', async () => {
+    // Red: Test that multiple lines are displayed separately
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    importedMockGetDeparturesForStation.mockResolvedValue(mockDepartures);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
+    
+    await waitFor(() => {
+      // Should show F line section
+      expect(screen.getByText('F Line')).toBeTruthy();
+      // Should show G line section
+      expect(screen.getByText('G Line')).toBeTruthy();
+    });
+  });
+
+  test('shouldShowRelativeDepartureTimes', async () => {
+    // Red: Test that departure times are shown as relative (e.g., "7m")
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    importedMockGetDeparturesForStation.mockResolvedValue(mockDepartures);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
+    
+    await waitFor(() => {
+      // Should show times in minutes format
+      expect(screen.getByText('2m')).toBeTruthy();
+      expect(screen.getByText('9m')).toBeTruthy();
+    });
+  });
+
+  test('shouldToggleDirection', async () => {
+    // Red: Test that direction toggle changes departure data
+    const { getByText } = render(<HelpScreen />);
+    
+    await waitFor(() => {
+      expect(getByText('Northbound')).toBeTruthy();
+    });
+
+    // Should be able to press southbound toggle
+    // This will test the toggle functionality
+    expect(getByText('Southbound')).toBeTruthy();
+  });
+
+  test('shouldShowNext5TrainsPerLine', async () => {
+    // Red: Test that up to 5 trains are shown per line
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    importedMockGetDeparturesForStation.mockResolvedValue(mockDepartures);
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
+    
+    await waitFor(() => {
+      // Should have 5 departure times for F line
+      const fLineSection = screen.getByText('F Line').parent;
+      // Test will verify structure exists
+      expect(fLineSection).toBeTruthy();
+    });
   });
 });

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Platform, RefreshControl, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Platform, RefreshControl, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MapPin, Navigation, Clock, AlertCircle } from 'lucide-react-native';
+import { MapPin, Navigation, Clock, AlertCircle, Train } from 'lucide-react-native';
 import { GPSLocationProvider, Location } from '../services/LocationService';
 import { NearestStationService, NearestStationResult } from '../services/NearestStationService';
+import { StationDepartureService, DeparturesByLine } from '../services/StationDepartureService';
 import { getThemeStyles } from '../design/components';
 import { useColorScheme } from 'react-native';
 
@@ -14,7 +15,17 @@ interface LocationState {
   error: string | null;
 }
 
-export function HelpScreen() {
+interface DepartureState {
+  departures: DeparturesByLine | null;
+  loading: boolean;
+  error: string | null;
+}
+
+interface HelpScreenProps {
+  locationProvider?: any;
+}
+
+export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
   const styles = getThemeStyles(isDarkMode);
@@ -26,7 +37,35 @@ export function HelpScreen() {
     error: null
   });
 
-  const gpsProvider = new GPSLocationProvider();
+  const [direction, setDirection] = useState<'northbound' | 'southbound'>('northbound');
+  
+  const [departureState, setDepartureState] = useState<DepartureState>({
+    departures: null,
+    loading: false,
+    error: null
+  });
+
+  const gpsProvider = locationProvider || new GPSLocationProvider();
+
+  const fetchDepartures = useCallback(async (station: any, direction: 'northbound' | 'southbound') => {
+    setDepartureState(prev => ({ ...prev, loading: true, error: null }));
+
+    try {
+      const departures = await StationDepartureService.getDeparturesForStation(station, direction);
+      setDepartureState({
+        departures,
+        loading: false,
+        error: null
+      });
+    } catch (error) {
+      console.error('Failed to fetch departures:', error);
+      setDepartureState({
+        departures: null,
+        loading: false,
+        error: 'Unable to fetch train departures'
+      });
+    }
+  }, []);
 
   const fetchLocation = useCallback(async () => {
     setLocationState(prev => ({ ...prev, loading: true, error: null }));
@@ -41,6 +80,11 @@ export function HelpScreen() {
         loading: false,
         error: null
       });
+
+      // Fetch departures for the nearest station
+      if (nearestStation) {
+        await fetchDepartures(nearestStation.station, direction);
+      }
     } catch (error) {
       let errorMessage = 'Unable to get your current location. Please try again.';
       
@@ -59,11 +103,22 @@ export function HelpScreen() {
         error: errorMessage
       });
     }
-  }, []);
+  }, [direction, fetchDepartures]);
 
   useEffect(() => {
     fetchLocation();
   }, [fetchLocation]);
+
+  // Handle direction changes
+  useEffect(() => {
+    if (locationState.nearestStation && !locationState.loading) {
+      fetchDepartures(locationState.nearestStation.station, direction);
+    }
+  }, [direction, locationState.nearestStation, locationState.loading, fetchDepartures]);
+
+  const handleDirectionChange = (newDirection: 'northbound' | 'southbound') => {
+    setDirection(newDirection);
+  };
 
   const formatTrainLines = (lines: string[]): string => {
     return `${lines.join(', ')} train${lines.length > 1 ? 's' : ''}`;
@@ -180,6 +235,105 @@ export function HelpScreen() {
             </View>
           </View>
         )}
+
+        {/* Direction Toggle */}
+        {locationState.nearestStation && (
+          <View style={[styles.routeCard.container, screenStyles.card]}>
+            <View style={screenStyles.directionToggleContainer}>
+              <TouchableOpacity
+                style={[
+                  screenStyles.directionToggle,
+                  direction === 'northbound' && screenStyles.directionToggleActive
+                ]}
+                onPress={() => handleDirectionChange('northbound')}
+              >
+                <Text style={[
+                  screenStyles.directionToggleText,
+                  direction === 'northbound' && screenStyles.directionToggleTextActive
+                ]}>
+                  Northbound
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  screenStyles.directionToggle,
+                  direction === 'southbound' && screenStyles.directionToggleActive
+                ]}
+                onPress={() => handleDirectionChange('southbound')}
+              >
+                <Text style={[
+                  screenStyles.directionToggleText,
+                  direction === 'southbound' && screenStyles.directionToggleTextActive
+                ]}>
+                  Southbound
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Next Departures */}
+        {locationState.nearestStation && departureState.departures && (
+          <View style={[styles.routeCard.container, screenStyles.card]}>
+            <View style={styles.routeCard.header}>
+              <View style={styles.routeCard.mainInfo}>
+                <View style={[styles.routeCard.iconContainer, { backgroundColor: styles.theme.colors.primary }]}>
+                  <Train size={20} color="#FFFFFF" />
+                </View>
+                <View style={styles.routeCard.textInfo}>
+                  <Text style={styles.routeCard.title}>Next Departures</Text>
+                  <Text style={styles.routeCard.subtitle}>
+                    {direction === 'northbound' ? 'Northbound' : 'Southbound'} trains
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Departures by Line */}
+            {Object.entries(departureState.departures).map(([line, departures]) => (
+              <View key={line} style={screenStyles.lineSection}>
+                <Text style={screenStyles.lineTitle}>{line} Line</Text>
+                <View style={screenStyles.departuresContainer}>
+                  {departures.slice(0, 5).map((departure, index) => (
+                    <View key={index} style={screenStyles.departureItem}>
+                      <View style={[screenStyles.trainPill, { backgroundColor: styles.theme.colors.primary }]}>
+                        <Text style={screenStyles.trainPillText}>{line}</Text>
+                      </View>
+                      <Text style={screenStyles.departureTime}>{departure.relativeTime}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Departures Loading */}
+        {locationState.nearestStation && departureState.loading && (
+          <View style={[styles.routeCard.container, screenStyles.card]}>
+            <View style={screenStyles.loadingContent}>
+              <Train size={24} color={styles.theme.colors.primary} />
+              <Text style={[styles.routeCard.title, screenStyles.loadingText]}>
+                Loading departures...
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Departures Error */}
+        {locationState.nearestStation && departureState.error && (
+          <View style={[styles.routeCard.container, screenStyles.card]}>
+            <View style={screenStyles.errorContent}>
+              <AlertCircle size={24} color={styles.theme.colors.error} />
+              <Text style={[styles.routeCard.title, { color: styles.theme.colors.error }]}>
+                Departure Information Unavailable
+              </Text>
+              <Text style={[styles.routeCard.subtitle, screenStyles.errorMessage]}>
+                {departureState.error}
+              </Text>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -233,5 +387,75 @@ const screenStyles = StyleSheet.create({
   trainsText: {
     fontWeight: '500',
     color: '#6B7280',
+  },
+  directionToggleContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    margin: 16,
+  },
+  directionToggle: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    marginHorizontal: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  directionToggleActive: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  directionToggleText: {
+    textAlign: 'center',
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  directionToggleTextActive: {
+    color: '#FFFFFF',
+  },
+  lineSection: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  lineTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  departuresContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  departureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+    marginBottom: 8,
+  },
+  trainPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 6,
+    minWidth: 28,
+    alignItems: 'center',
+  },
+  trainPillText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  departureTime: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
   }
 });
