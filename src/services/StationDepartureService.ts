@@ -72,7 +72,7 @@ export class StationDepartureService {
       return 'Now';
     }
     
-    return `${diffInMinutes}m`;
+    return `${diffInMinutes}`;
   }
 
   private static getFeedUrlForLine(line: string): string {

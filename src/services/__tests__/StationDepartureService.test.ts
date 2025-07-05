@@ -73,16 +73,16 @@ describe('StationDepartureService', () => {
   });
 
   test('shouldFormatRelativeTimesCorrectly', async () => {
-    // Red: Test that relative times are formatted as expected
+    // Green: Test that relative times are formatted as expected (numbers only, no 'm' suffix)
     const departures = await StationDepartureService.getDeparturesForStation(mockStation, 'northbound');
     
-    // All relative times should end with 'm' (for minutes)
+    // All relative times should be numbers only (no 'm' suffix to reduce visual clutter)
     departures.F.forEach(departure => {
-      expect(departure.relativeTime).toMatch(/^\d+m$/);
+      expect(departure.relativeTime).toMatch(/^\d+$|^Now$/);
     });
     
     departures.G.forEach(departure => {
-      expect(departure.relativeTime).toMatch(/^\d+m$/);
+      expect(departure.relativeTime).toMatch(/^\d+$|^Now$/);
     });
   });
 });

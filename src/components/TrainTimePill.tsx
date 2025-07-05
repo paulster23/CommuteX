@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     borderRadius: 12, // Reduced from 16 for compact appearance
     marginRight: 6, // Reduced from 8 for wider pills
     marginBottom: 4,
-    minWidth: 40,
+    width: 40, // Fixed width to prevent layout jumping
     alignItems: 'center',
     justifyContent: 'center',
   },

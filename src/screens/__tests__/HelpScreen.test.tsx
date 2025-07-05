@@ -74,13 +74,13 @@ describe('HelpScreen', () => {
 
   const mockDepartures = {
     F: [
-      { line: 'F', departureTime: new Date(Date.now() + 2 * 60000), relativeTime: '2m' },
-      { line: 'F', departureTime: new Date(Date.now() + 9 * 60000), relativeTime: '9m' },
-      { line: 'F', departureTime: new Date(Date.now() + 16 * 60000), relativeTime: '16m' },
+      { line: 'F', departureTime: new Date(Date.now() + 2 * 60000), relativeTime: '2' },
+      { line: 'F', departureTime: new Date(Date.now() + 9 * 60000), relativeTime: '9' },
+      { line: 'F', departureTime: new Date(Date.now() + 16 * 60000), relativeTime: '16' },
     ],
     G: [
-      { line: 'G', departureTime: new Date(Date.now() + 5 * 60000), relativeTime: '5m' },
-      { line: 'G', departureTime: new Date(Date.now() + 12 * 60000), relativeTime: '12m' },
+      { line: 'G', departureTime: new Date(Date.now() + 5 * 60000), relativeTime: '5' },
+      { line: 'G', departureTime: new Date(Date.now() + 12 * 60000), relativeTime: '12' },
     ]
   };
 
@@ -278,8 +278,8 @@ describe('HelpScreen', () => {
     
     await waitFor(() => {
       expect(screen.getByText('Bergen St')).toBeTruthy();
-      // Should show relative times like "2m"
-      expect(screen.getByText('2m')).toBeTruthy();
+      // Should show relative times like "2" (without 'm' suffix)
+      expect(screen.getByText('2')).toBeTruthy();
     });
   });
 
@@ -318,9 +318,9 @@ describe('HelpScreen', () => {
     render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
-      // Should show times in minutes format
-      expect(screen.getByText('2m')).toBeTruthy();
-      expect(screen.getByText('9m')).toBeTruthy();
+      // Should show times as numbers (without 'm' suffix for cleaner UI)
+      expect(screen.getByText('2')).toBeTruthy();
+      expect(screen.getByText('9')).toBeTruthy();
     });
   });
 
@@ -345,9 +345,9 @@ describe('HelpScreen', () => {
       expect(screen.getByTestId('time-pill-G-0')).toBeTruthy();
       expect(screen.getByTestId('time-pill-G-1')).toBeTruthy();
       
-      // Time pills should contain the departure times
-      expect(screen.getByText('2m')).toBeTruthy();
-      expect(screen.getByText('5m')).toBeTruthy();
+      // Time pills should contain the departure times (numbers only)
+      expect(screen.getByText('2')).toBeTruthy();
+      expect(screen.getByText('5')).toBeTruthy();
     });
   });
 
@@ -378,25 +378,25 @@ describe('HelpScreen', () => {
     // Red: Test that northbound and southbound show different departure times
     const mockNorthboundDepartures = {
       F: [
-        { line: 'F', departureTime: new Date(Date.now() + 3 * 60000), relativeTime: '3m' },
-        { line: 'F', departureTime: new Date(Date.now() + 10 * 60000), relativeTime: '10m' },
-        { line: 'F', departureTime: new Date(Date.now() + 17 * 60000), relativeTime: '17m' },
+        { line: 'F', departureTime: new Date(Date.now() + 3 * 60000), relativeTime: '3' },
+        { line: 'F', departureTime: new Date(Date.now() + 10 * 60000), relativeTime: '10' },
+        { line: 'F', departureTime: new Date(Date.now() + 17 * 60000), relativeTime: '17' },
       ],
       G: [
-        { line: 'G', departureTime: new Date(Date.now() + 6 * 60000), relativeTime: '6m' },
-        { line: 'G', departureTime: new Date(Date.now() + 13 * 60000), relativeTime: '13m' },
+        { line: 'G', departureTime: new Date(Date.now() + 6 * 60000), relativeTime: '6' },
+        { line: 'G', departureTime: new Date(Date.now() + 13 * 60000), relativeTime: '13' },
       ]
     };
 
     const mockSouthboundDepartures = {
       F: [
-        { line: 'F', departureTime: new Date(Date.now() + 4 * 60000), relativeTime: '4m' },
-        { line: 'F', departureTime: new Date(Date.now() + 11 * 60000), relativeTime: '11m' },
-        { line: 'F', departureTime: new Date(Date.now() + 18 * 60000), relativeTime: '18m' },
+        { line: 'F', departureTime: new Date(Date.now() + 4 * 60000), relativeTime: '4' },
+        { line: 'F', departureTime: new Date(Date.now() + 11 * 60000), relativeTime: '11' },
+        { line: 'F', departureTime: new Date(Date.now() + 18 * 60000), relativeTime: '18' },
       ],
       G: [
-        { line: 'G', departureTime: new Date(Date.now() + 7 * 60000), relativeTime: '7m' },
-        { line: 'G', departureTime: new Date(Date.now() + 14 * 60000), relativeTime: '14m' },
+        { line: 'G', departureTime: new Date(Date.now() + 7 * 60000), relativeTime: '7' },
+        { line: 'G', departureTime: new Date(Date.now() + 14 * 60000), relativeTime: '14' },
       ]
     };
 
@@ -421,8 +421,8 @@ describe('HelpScreen', () => {
     
     // Wait for initial northbound data to load
     await waitFor(() => {
-      expect(getByText('3m')).toBeTruthy(); // Northbound F train time
-      expect(getByText('6m')).toBeTruthy(); // Northbound G train time
+      expect(getByText('3')).toBeTruthy(); // Northbound F train time
+      expect(getByText('6')).toBeTruthy(); // Northbound G train time
     });
 
     // Click southbound toggle
@@ -431,13 +431,13 @@ describe('HelpScreen', () => {
 
     // Wait for southbound data to load (should be different times)
     await waitFor(() => {
-      expect(getByText('4m')).toBeTruthy(); // Southbound F train time
-      expect(getByText('7m')).toBeTruthy(); // Southbound G train time
+      expect(getByText('4')).toBeTruthy(); // Southbound F train time
+      expect(getByText('7')).toBeTruthy(); // Southbound G train time
     });
 
     // Verify northbound times are no longer visible
-    expect(() => getByText('3m')).toThrow();
-    expect(() => getByText('6m')).toThrow();
+    expect(() => getByText('3')).toThrow();
+    expect(() => getByText('6')).toThrow();
   });
 
 
