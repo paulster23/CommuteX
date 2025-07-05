@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Platform, RefreshControl, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MapPin, Navigation, Clock, AlertCircle, Train } from 'lucide-react-native';
+import { MapPin, Navigation, Clock, AlertCircle, Train, Zap } from 'lucide-react-native';
 import { GPSLocationProvider, Location } from '../services/LocationService';
 import { NearestStationService, NearestStationResult } from '../services/NearestStationService';
 import { StationDepartureService, DeparturesByLine } from '../services/StationDepartureService';
-import { getCompactThemeStyles } from '../design/components';
+import { getThemeStyles } from '../design/components';
 import { useColorScheme } from 'react-native';
 import { TransferRouteIcon } from '../components/TransferRouteIcon';
 import { TrainTimePill } from '../components/TrainTimePill';
@@ -30,7 +30,7 @@ interface HelpScreenProps {
 export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
-  const styles = getCompactThemeStyles(isDarkMode);
+  const styles = getThemeStyles(isDarkMode);
   
   const [locationState, setLocationState] = useState<LocationState>({
     location: null,
@@ -46,6 +46,8 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
     loading: false,
     error: null
   });
+
+  const [lastUpdated, setLastUpdated] = useState(new Date());
 
   const gpsProvider = locationProvider || new GPSLocationProvider();
 
@@ -82,6 +84,8 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
         loading: false,
         error: null
       });
+
+      setLastUpdated(new Date());
 
       // Fetch departures for the nearest station
       if (nearestStation) {
@@ -144,6 +148,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
     >
       <ScrollView
         style={screenStyles.content}
+        contentContainerStyle={{ paddingBottom: locationState.nearestStation ? 100 : 20 }}
         refreshControl={
           <RefreshControl 
             refreshing={locationState.loading} 
@@ -153,12 +158,24 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
         }
       >
         {/* Header */}
-        <View style={[styles.header.container, { borderBottomWidth: 0 }]}>
-          <View>
-            <Text style={styles.header.title}>Help & Location</Text>
-            <Text style={styles.header.subtitle}>Your current location and nearby transit</Text>
+        <View style={styles.header.container}>
+          <View style={{ flex: 1 }}>
+            {/* LIVE Status moved above title */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <View style={[styles.indicator.container, styles.indicator.live, { marginRight: 8 }]}>
+                <Zap size={10} color={styles.theme.colors.success} style={{ marginRight: 4 }} />
+                <Text style={[styles.indicator.text, styles.indicator.liveText, { fontSize: 10 }]}>LIVE</Text>
+              </View>
+              <Text style={{ fontSize: 10, color: styles.theme.colors.textSecondary }}>
+                {lastUpdated.toLocaleTimeString()}
+              </Text>
+            </View>
+            
+            <Text style={[styles.header.title, { fontSize: 24 }]}>Nearest Station</Text>
+            <Text style={[styles.header.subtitle, { fontSize: 13 }]}>
+              Your current location and nearby transit
+            </Text>
           </View>
-          <MapPin size={24} color={styles.theme.colors.primary} />
         </View>
 
         {/* Loading State */}
@@ -188,95 +205,8 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
           </View>
         )}
 
-        {/* Location Information */}
-        {locationState.location && (
-          <View style={[styles.routeCard.container, screenStyles.card]}>
-            <View style={styles.routeCard.header}>
-              <View style={styles.routeCard.mainInfo}>
-                <View style={[styles.routeCard.iconContainer, { backgroundColor: styles.theme.colors.primary }]}>
-                  <MapPin size={20} color="#FFFFFF" />
-                </View>
-                <View style={styles.routeCard.textInfo}>
-                  <Text style={styles.routeCard.title}>Your Location</Text>
-                  <Text style={styles.routeCard.subtitle}>
-                    {locationState.location.lat.toFixed(6)}, {locationState.location.lng.toFixed(6)}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
 
-        {/* Nearest Station Information */}
-        {locationState.nearestStation && (
-          <View style={[styles.routeCard.container, screenStyles.card]}>
-            <View style={styles.routeCard.header}>
-              <View style={styles.routeCard.mainInfo}>
-                <View style={[styles.routeCard.iconContainer, { backgroundColor: styles.theme.colors.success }]}>
-                  <Clock size={20} color="#FFFFFF" />
-                </View>
-                <View style={styles.routeCard.textInfo}>
-                  <Text style={styles.routeCard.title}>Nearest Subway Station</Text>
-                  <Text style={[styles.routeCard.subtitle, screenStyles.stationName, { color: styles.theme.colors.text }]}>
-                    {locationState.nearestStation.station.name}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.routeCard.timeInfo}>
-                <Text style={[styles.routeCard.arrivalTime, screenStyles.distance]}>
-                  {formatDistance(locationState.nearestStation.distance)}
-                </Text>
-              </View>
-            </View>
-            
-            {/* Train Lines */}
-            <View style={[screenStyles.trainsContainer, { borderTopColor: styles.theme.colors.border }]}>
-              <Text style={[styles.routeCard.subtitle, screenStyles.trainsText, { color: styles.theme.colors.textSecondary }]}>
-                {formatTrainLines(locationState.nearestStation.station.lines)}
-              </Text>
-            </View>
-          </View>
-        )}
 
-        {/* Direction Toggle */}
-        {locationState.nearestStation && (
-          <View style={[styles.routeCard.container, screenStyles.card]}>
-            <View style={[screenStyles.directionToggleContainer, { backgroundColor: styles.theme.colors.surfaceSecondary }]}>
-              <TouchableOpacity
-                style={[
-                  screenStyles.directionToggle,
-                  { backgroundColor: styles.theme.colors.surface, borderColor: styles.theme.colors.border },
-                  direction === 'northbound' && [screenStyles.directionToggleActive, { backgroundColor: styles.theme.colors.primary, borderColor: styles.theme.colors.primary }]
-                ]}
-                onPress={() => handleDirectionChange('northbound')}
-              >
-                <Text style={[
-                  screenStyles.directionToggleText,
-                  { color: styles.theme.colors.textSecondary },
-                  direction === 'northbound' && [screenStyles.directionToggleTextActive, { color: '#FFFFFF' }]
-                ]}>
-                  North
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  screenStyles.directionToggle,
-                  { backgroundColor: styles.theme.colors.surface, borderColor: styles.theme.colors.border },
-                  direction === 'southbound' && [screenStyles.directionToggleActive, { backgroundColor: styles.theme.colors.primary, borderColor: styles.theme.colors.primary }]
-                ]}
-                onPress={() => handleDirectionChange('southbound')}
-              >
-                <Text style={[
-                  screenStyles.directionToggleText,
-                  { color: styles.theme.colors.textSecondary },
-                  direction === 'southbound' && [screenStyles.directionToggleTextActive, { color: '#FFFFFF' }]
-                ]}>
-                  South
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
 
         {/* Next Departures */}
         {locationState.nearestStation && departureState.departures && (
@@ -287,9 +217,9 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                   <Train size={20} color="#FFFFFF" />
                 </View>
                 <View style={styles.routeCard.textInfo}>
-                  <Text style={styles.routeCard.title}>Next Departures</Text>
+                  <Text style={styles.routeCard.title}>{locationState.nearestStation.station.name}</Text>
                   <Text style={styles.routeCard.subtitle}>
-                    {direction === 'northbound' ? 'North' : 'South'} trains
+                    {formatDistance(locationState.nearestStation.distance)} • {direction === 'northbound' ? 'North' : 'South'} trains
                   </Text>
                 </View>
               </View>
@@ -315,6 +245,25 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                 </View>
               </View>
             ))}
+          </View>
+        )}
+
+        {/* Location Information */}
+        {locationState.location && (
+          <View style={[styles.routeCard.container, screenStyles.card]}>
+            <View style={styles.routeCard.header}>
+              <View style={styles.routeCard.mainInfo}>
+                <View style={[styles.routeCard.iconContainer, { backgroundColor: styles.theme.colors.primary }]}>
+                  <MapPin size={20} color="#FFFFFF" />
+                </View>
+                <View style={styles.routeCard.textInfo}>
+                  <Text style={styles.routeCard.title}>Your Location</Text>
+                  <Text style={styles.routeCard.subtitle}>
+                    {locationState.location.lat.toFixed(6)}, {locationState.location.lng.toFixed(6)}
+                  </Text>
+                </View>
+              </View>
+            </View>
           </View>
         )}
 
@@ -345,6 +294,46 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
           </View>
         )}
       </ScrollView>
+      
+      {/* Fixed Direction Toggle - Pinned above bottom navigation */}
+      {locationState.nearestStation && (
+        <View style={[screenStyles.fixedToggleContainer, { backgroundColor: styles.theme.colors.background }]}>
+          <View style={[screenStyles.directionToggleContainer, { backgroundColor: styles.theme.colors.surfaceSecondary }]}>
+            <TouchableOpacity
+              style={[
+                screenStyles.directionToggle,
+                { backgroundColor: styles.theme.colors.surface, borderColor: styles.theme.colors.border },
+                direction === 'northbound' && [screenStyles.directionToggleActive, { backgroundColor: styles.theme.colors.primary, borderColor: styles.theme.colors.primary }]
+              ]}
+              onPress={() => handleDirectionChange('northbound')}
+            >
+              <Text style={[
+                screenStyles.directionToggleText,
+                { color: styles.theme.colors.textSecondary },
+                direction === 'northbound' && [screenStyles.directionToggleTextActive, { color: '#FFFFFF' }]
+              ]}>
+                North
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                screenStyles.directionToggle,
+                { backgroundColor: styles.theme.colors.surface, borderColor: styles.theme.colors.border },
+                direction === 'southbound' && [screenStyles.directionToggleActive, { backgroundColor: styles.theme.colors.primary, borderColor: styles.theme.colors.primary }]
+              ]}
+              onPress={() => handleDirectionChange('southbound')}
+            >
+              <Text style={[
+                screenStyles.directionToggleText,
+                { color: styles.theme.colors.textSecondary },
+                direction === 'southbound' && [screenStyles.directionToggleTextActive, { color: '#FFFFFF' }]
+              ]}>
+                South
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -439,5 +428,18 @@ const screenStyles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
+  },
+  fixedToggleContainer: {
+    position: 'absolute',
+    bottom: 80, // Position above the 80px tall bottom navigation
+    left: 0,
+    right: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
   }
 });

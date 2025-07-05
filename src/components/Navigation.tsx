@@ -64,7 +64,7 @@ export function AppNavigator() {
       <Tab.Screen 
         name="Help" 
         component={HelpScreen}
-        options={{ tabBarLabel: 'Help' }}
+        options={{ tabBarLabel: 'Stations' }}
       />
       <Tab.Screen 
         name="Settings" 

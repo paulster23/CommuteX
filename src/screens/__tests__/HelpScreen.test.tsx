@@ -56,6 +56,7 @@ jest.mock('lucide-react-native', () => ({
   Clock: () => null,
   AlertCircle: () => null,
   Train: () => null,
+  Zap: () => null,
 }));
 
 describe('HelpScreen', () => {
@@ -94,7 +95,7 @@ describe('HelpScreen', () => {
     // Red: Test that Help screen renders with title
     render(<HelpScreen />);
     
-    expect(screen.getByText('Help & Location')).toBeTruthy();
+    expect(screen.getByText('Nearest Station')).toBeTruthy();
   });
 
   test('shouldShowLoadingStateInitially', () => {
@@ -123,7 +124,7 @@ describe('HelpScreen', () => {
   });
 
   test('shouldDisplayNearestSubwayStation', async () => {
-    // Red: Test that nearest subway station is displayed
+    // Red: Test that nearest subway station is displayed in the departures section
     
     const mockLocationProvider = {
       getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
@@ -135,10 +136,8 @@ describe('HelpScreen', () => {
     render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
-      expect(screen.getByText('Nearest Subway Station')).toBeTruthy();
       expect(screen.getByText('Bergen St')).toBeTruthy();
-      expect(screen.getByText('F, G trains')).toBeTruthy();
-      expect(screen.getByText('0.16 miles away')).toBeTruthy();
+      expect(screen.getByText('0.16 miles away • North trains')).toBeTruthy();
     });
   });
 
@@ -187,7 +186,7 @@ describe('HelpScreen', () => {
     render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
-      expect(screen.getByText('0.16 miles away')).toBeTruthy();
+      expect(screen.getByText('0.16 miles away • North trains')).toBeTruthy();
     });
   });
 
@@ -215,7 +214,7 @@ describe('HelpScreen', () => {
     
     await waitFor(() => {
       expect(screen.getByText('Union Sq-14th St')).toBeTruthy();
-      expect(screen.getByText('4, 5, 6, L, N, Q, R, W trains')).toBeTruthy();
+      expect(screen.getByText('0.50 miles away • North trains')).toBeTruthy();
     });
   });
 
@@ -244,7 +243,7 @@ describe('HelpScreen', () => {
     render(<HelpScreen />);
     
     // Should render with proper styling from design system
-    expect(screen.getByText('Help & Location')).toBeTruthy();
+    expect(screen.getByText('Nearest Station')).toBeTruthy();
   });
 
   test('shouldShowDirectionToggle', async () => {
@@ -278,7 +277,7 @@ describe('HelpScreen', () => {
     render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
-      expect(screen.getByText('Next Departures')).toBeTruthy();
+      expect(screen.getByText('Bergen St')).toBeTruthy();
       // Should show relative times like "2m"
       expect(screen.getByText('2m')).toBeTruthy();
     });
@@ -371,7 +370,7 @@ describe('HelpScreen', () => {
 
     // Should show departure data initially
     await waitFor(() => {
-      expect(getByText('Next Departures')).toBeTruthy();
+      expect(getByText('Bergen St')).toBeTruthy();
     });
   });
 
@@ -477,12 +476,12 @@ describe('HelpScreen', () => {
     
     await waitFor(() => {
       // Should use compact card padding (12px instead of 16px)
-      const helpTitle = screen.getByText('Help & Location');
+      const helpTitle = screen.getByText('Nearest Station');
       expect(helpTitle).toBeTruthy();
       
       // Should use compact margins between sections
       expect(screen.getByText('Your Location')).toBeTruthy();
-      expect(screen.getByText('Nearest Subway Station')).toBeTruthy();
+      expect(screen.getByText('Bergen St')).toBeTruthy();
     });
   });
 });
