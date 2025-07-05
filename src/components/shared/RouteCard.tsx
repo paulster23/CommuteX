@@ -89,21 +89,6 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
               {subwayLine && <TransferRouteIcon routeLine={subwayLine} />}
             </View>
           </View>
-          <View style={styles.routeCard.textInfo}>
-            <Text style={styles.routeCard.title}>
-              {route.startingStation && route.endingStation 
-                ? `${route.startingStation} → ${route.endingStation}`
-                : 'Your Commute'}
-            </Text>
-            <Text style={styles.routeCard.subtitle}>
-              {route.method} • {route.transfers === 0 ? 'Direct' : `${route.transfers} transfer${route.transfers > 1 ? 's' : ''}`}
-            </Text>
-            {route.walkingDistance && (
-              <Text style={[styles.routeCard.subtitle, { fontSize: 11, marginTop: 2 }]}>
-                {route.walkingDistance} walk
-              </Text>
-            )}
-          </View>
         </View>
         
         <View style={[styles.routeCard.timeInfo, { paddingRight: 4, alignItems: 'flex-end' }]}>
@@ -113,21 +98,68 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
           <Text style={[styles.routeCard.duration, { fontSize: 12, marginBottom: 4 }]}>
             {route.duration}
           </Text>
-          {route.confidence && (
-            <Text style={[styles.routeCard.subtitle, { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }]}>
-              {route.confidence} confidence
-            </Text>
-          )}
+        </View>
+      </View>
+
+      {/* Full-Width Route Summary */}
+      <View style={{ 
+        paddingHorizontal: 16, 
+        paddingVertical: 8,
+        borderTopWidth: 1,
+        borderTopColor: styles.theme.colors.borderLight
+      }}>
+        {/* Route description with LIVE indicator */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+          <Text style={{ 
+            fontSize: 12, 
+            color: styles.theme.colors.text,
+            fontWeight: '500',
+            flex: 1
+          }}>
+            {route.startingStation && route.endingStation 
+              ? `${route.startingStation} → ${route.endingStation}`
+              : 'Your Commute'}
+          </Text>
+          
+          {/* LIVE/ESTIMATED indicator */}
           {route.isRealTimeData ? (
-            <View style={[styles.indicator.container, styles.indicator.live, { marginTop: 4 }]}>
-              <View style={[styles.indicator.dot, styles.indicator.liveDot]} />
-              <Text style={[styles.indicator.text, styles.indicator.liveText]}>LIVE</Text>
+            <View style={[styles.indicator.container, styles.indicator.live, { paddingHorizontal: 6, paddingVertical: 2 }]}>
+              <View style={[styles.indicator.dot, styles.indicator.liveDot, { width: 4, height: 4, borderRadius: 2, marginRight: 3 }]} />
+              <Text style={[styles.indicator.text, styles.indicator.liveText, { fontSize: 8 }]}>LIVE</Text>
             </View>
           ) : (
-            <View style={[styles.indicator.container, styles.indicator.estimated, { marginTop: 4 }]}>
-              <View style={[styles.indicator.dot, styles.indicator.estimatedDot]} />
-              <Text style={[styles.indicator.text, styles.indicator.estimatedText]}>ESTIMATED</Text>
+            <View style={[styles.indicator.container, styles.indicator.estimated, { paddingHorizontal: 6, paddingVertical: 2 }]}>
+              <View style={[styles.indicator.dot, styles.indicator.estimatedDot, { width: 4, height: 4, borderRadius: 2, marginRight: 3 }]} />
+              <Text style={[styles.indicator.text, styles.indicator.estimatedText, { fontSize: 8 }]}>ESTIMATED</Text>
             </View>
+          )}
+        </View>
+        
+        {/* Walking distance with confidence */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          {route.walkingDistance ? (
+            <Text style={{ 
+              fontSize: 11, 
+              color: styles.theme.colors.textSecondary,
+              lineHeight: 16
+            }}>
+              {route.walkingDistance} walk
+            </Text>
+          ) : (
+            <View />
+          )}
+          
+          {/* Confidence indicator */}
+          {route.confidence && (
+            <Text style={{ 
+              fontSize: 9, 
+              color: styles.theme.colors.textTertiary,
+              textTransform: 'uppercase', 
+              letterSpacing: 0.5,
+              fontWeight: '500'
+            }}>
+              {route.confidence} confidence
+            </Text>
           )}
         </View>
       </View>
