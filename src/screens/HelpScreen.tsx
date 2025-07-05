@@ -370,7 +370,7 @@ const screenStyles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 12, // Reduced from 16 for compact mobile
+    paddingHorizontal: 8, // Match padding with Morning/Afternoon pages
   },
   card: {
     marginTop: 12, // Reduced from 16 for compact spacing
