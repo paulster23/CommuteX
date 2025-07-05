@@ -147,7 +147,7 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
       >
         <View 
           style={{ 
-            paddingVertical: 20, 
+            paddingVertical: 12, 
             paddingHorizontal: 16,
             borderTopWidth: 1, 
             borderTopColor: styles.theme.colors.borderLight,
@@ -156,10 +156,10 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
         >
           {/* Route Steps Timeline */}
           <Text style={{ 
-            fontSize: 14, 
+            fontSize: 13, 
             fontWeight: '600', 
             color: styles.theme.colors.text,
-            marginBottom: 16 
+            marginBottom: 10 
           }}>
             Trip Details
           </Text>
@@ -174,13 +174,13 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
             const isLastStep = index === route.steps.length - 1;
             
             return (
-              <View key={index} style={{ flexDirection: 'row', marginBottom: isLastStep ? 0 : 16 }}>
+              <View key={index} style={{ flexDirection: 'row', marginBottom: isLastStep ? 0 : 10 }}>
                 {/* Timeline Indicator */}
-                <View style={{ alignItems: 'center', width: 32, marginRight: 12 }}>
+                <View style={{ alignItems: 'center', width: 28, marginRight: 10 }}>
                   <View style={{ 
-                    width: 28, 
-                    height: 28, 
-                    borderRadius: 14, 
+                    width: 24, 
+                    height: 24, 
+                    borderRadius: 12, 
                     justifyContent: 'center', 
                     alignItems: 'center', 
                     backgroundColor: step.type === 'transit' ? 
@@ -188,14 +188,14 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
                       styles.theme.colors.surface,
                     borderWidth: step.type === 'transit' ? 0 : 2,
                     borderColor: step.type === 'transit' ? 'transparent' : styles.theme.colors.border,
-                    elevation: 2,
+                    elevation: 1,
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 1 },
                     shadowOpacity: 0.1,
-                    shadowRadius: 2,
+                    shadowRadius: 1,
                   }}>
                     <Text style={{ 
-                      fontSize: step.type === 'transit' ? 12 : 14, 
+                      fontSize: step.type === 'transit' ? 10 : 12, 
                       fontWeight: '600', 
                       color: step.type === 'transit' ? '#fff' : styles.theme.colors.text 
                     }}>
@@ -207,21 +207,21 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
                   {!isLastStep && (
                     <View style={{ 
                       width: 2, 
-                      height: 20, 
+                      height: 16, 
                       backgroundColor: styles.theme.colors.borderLight,
-                      marginTop: 4 
+                      marginTop: 3 
                     }} />
                   )}
                 </View>
                 
                 {/* Step Content */}
-                <View style={{ flex: 1, paddingBottom: isLastStep ? 0 : 4 }}>
+                <View style={{ flex: 1, paddingBottom: isLastStep ? 0 : 2 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Text style={{ 
-                      fontSize: 14, 
+                      fontSize: 13, 
                       flex: 1, 
                       color: styles.theme.colors.text, 
-                      lineHeight: 20,
+                      lineHeight: 18,
                       marginRight: 8 
                     }}>
                       {step.description}
@@ -231,19 +231,19 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
                       flexDirection: 'row', 
                       alignItems: 'center',
                       backgroundColor: styles.theme.colors.surface,
-                      paddingHorizontal: 8,
-                      paddingVertical: 3,
-                      borderRadius: 12
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 10
                     }}>
                       <View style={{ 
-                        width: 6, 
-                        height: 6, 
-                        borderRadius: 3, 
+                        width: 5, 
+                        height: 5, 
+                        borderRadius: 2.5, 
                         backgroundColor: dotColor, 
-                        marginRight: 4 
+                        marginRight: 3 
                       }} />
                       <Text style={{ 
-                        fontSize: 11, 
+                        fontSize: 10, 
                         color: styles.theme.colors.textSecondary, 
                         fontWeight: '500' 
                       }}>
@@ -255,10 +255,10 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
                   {/* Additional step info */}
                   {step.fromStation && step.toStation && (
                     <Text style={{ 
-                      fontSize: 11, 
+                      fontSize: 10, 
                       color: styles.theme.colors.textTertiary,
-                      marginTop: 4,
-                      lineHeight: 16
+                      marginTop: 2,
+                      lineHeight: 14
                     }}>
                       {step.fromStation} → {step.toStation}
                     </Text>
@@ -275,11 +275,11 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
         backgroundColor: styles.theme.colors.surface,
         borderTopWidth: 1,
         borderTopColor: styles.theme.colors.borderLight,
-        paddingVertical: 12,
+        paddingVertical: 8,
         paddingHorizontal: 16
       }]}>
         <Text style={[styles.routeCard.expandText, { 
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: '500'
         }]}>
           {isExpanded ? 'Hide details' : 'Show details'}
