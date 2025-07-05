@@ -144,9 +144,15 @@ export class StationDepartureService {
       const now = new Date();
       const arrivals: StopTimeUpdate[] = [];
       
-      // Generate next 6 train arrivals (every 6-8 minutes during peak)
+      // Generate different departure times based on direction
+      // Northbound and southbound trains have different schedules to simulate real MTA timing
+      // This ensures the UI toggle shows meaningfully different departure times
+      const baseOffsetMinutes = direction === 'northbound' ? 2 : 4; // Start 2min for NB, 4min for SB
+      const intervalMinutes = direction === 'northbound' ? 7 : 6; // 7min intervals for NB, 6min for SB
+      
+      // Generate next 6 train arrivals with direction-specific timing
       for (let i = 0; i < 6; i++) {
-        const departureTime = new Date(now.getTime() + (i * 7 + 2) * 60000); // 2, 9, 16, 23 minutes from now
+        const departureTime = new Date(now.getTime() + (i * intervalMinutes + baseOffsetMinutes) * 60000);
         arrivals.push({
           stopId: stopId,
           stopSequence: 1,

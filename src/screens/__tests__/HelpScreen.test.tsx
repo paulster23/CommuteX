@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react-native';
 import { HelpScreen } from '../HelpScreen';
 import { GPSLocationProvider } from '../../services/LocationService';
 import { NearestStationService, mockFindNearestStation as importedMockFindNearestStation } from '../../services/NearestStationService';
@@ -325,16 +325,93 @@ describe('HelpScreen', () => {
 
   test('shouldToggleDirection', async () => {
     // Red: Test that direction toggle changes departure data
-    const { getByText } = render(<HelpScreen />);
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    importedMockGetDeparturesForStation.mockResolvedValue(mockDepartures);
+    
+    const { getByText } = render(<HelpScreen locationProvider={mockLocationProvider} />);
     
     await waitFor(() => {
       expect(getByText('Northbound')).toBeTruthy();
+      expect(getByText('Southbound')).toBeTruthy();
     });
 
-    // Should be able to press southbound toggle
-    // This will test the toggle functionality
-    expect(getByText('Southbound')).toBeTruthy();
+    // Should show departure data initially
+    await waitFor(() => {
+      expect(getByText('Next Departures')).toBeTruthy();
+    });
   });
+
+  test('shouldShowDifferentDeparturesForEachDirection', async () => {
+    // Red: Test that northbound and southbound show different departure times
+    const mockNorthboundDepartures = {
+      F: [
+        { line: 'F', departureTime: new Date(Date.now() + 3 * 60000), relativeTime: '3m' },
+        { line: 'F', departureTime: new Date(Date.now() + 10 * 60000), relativeTime: '10m' },
+        { line: 'F', departureTime: new Date(Date.now() + 17 * 60000), relativeTime: '17m' },
+      ],
+      G: [
+        { line: 'G', departureTime: new Date(Date.now() + 6 * 60000), relativeTime: '6m' },
+        { line: 'G', departureTime: new Date(Date.now() + 13 * 60000), relativeTime: '13m' },
+      ]
+    };
+
+    const mockSouthboundDepartures = {
+      F: [
+        { line: 'F', departureTime: new Date(Date.now() + 4 * 60000), relativeTime: '4m' },
+        { line: 'F', departureTime: new Date(Date.now() + 11 * 60000), relativeTime: '11m' },
+        { line: 'F', departureTime: new Date(Date.now() + 18 * 60000), relativeTime: '18m' },
+      ],
+      G: [
+        { line: 'G', departureTime: new Date(Date.now() + 7 * 60000), relativeTime: '7m' },
+        { line: 'G', departureTime: new Date(Date.now() + 14 * 60000), relativeTime: '14m' },
+      ]
+    };
+
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    // Set up the nearest station mock to return our mock station
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    
+    // Mock to return different departures based on direction
+    importedMockGetDeparturesForStation
+      .mockImplementation((station, direction) => {
+        if (direction === 'northbound') {
+          return Promise.resolve(mockNorthboundDepartures);
+        } else {
+          return Promise.resolve(mockSouthboundDepartures);
+        }
+      });
+    
+    const { getByText } = render(<HelpScreen locationProvider={mockLocationProvider} />);
+    
+    // Wait for initial northbound data to load
+    await waitFor(() => {
+      expect(getByText('3m')).toBeTruthy(); // Northbound F train time
+      expect(getByText('6m')).toBeTruthy(); // Northbound G train time
+    });
+
+    // Click southbound toggle
+    const southboundButton = getByText('Southbound');
+    fireEvent.press(southboundButton);
+
+    // Wait for southbound data to load (should be different times)
+    await waitFor(() => {
+      expect(getByText('4m')).toBeTruthy(); // Southbound F train time
+      expect(getByText('7m')).toBeTruthy(); // Southbound G train time
+    });
+
+    // Verify northbound times are no longer visible
+    expect(() => getByText('3m')).toThrow();
+    expect(() => getByText('6m')).toThrow();
+  });
+
 
   test('shouldShowNext5TrainsPerLine', async () => {
     // Red: Test that up to 5 trains are shown per line
