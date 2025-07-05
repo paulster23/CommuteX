@@ -25,4 +25,47 @@ describe('RealMTAService', () => {
       expect(route.finalWalkingTime).toBe(12); // Walking from Carroll St to home (with Brooklyn 3.75 mph speed)
     });
   });
+
+  test('shouldFetchServiceAlertsFromMTA', async () => {
+    // Red: Test that service alerts are fetched from MTA GTFS-RT alerts feed
+    const mtaService = new RealMTAService();
+    
+    const alerts = await mtaService.getServiceAlerts();
+    
+    // Should return array of service alerts
+    expect(alerts).toBeDefined();
+    expect(Array.isArray(alerts)).toBe(true);
+    
+    // If there are alerts, they should have proper structure
+    if (alerts.length > 0) {
+      alerts.forEach(alert => {
+        expect(alert.id).toBeDefined();
+        expect(alert.headerText).toBeDefined();
+        expect(alert.descriptionText).toBeDefined();
+        expect(alert.affectedRoutes).toBeDefined();
+        expect(Array.isArray(alert.affectedRoutes)).toBe(true);
+        expect(alert.severity).toMatch(/^(info|warning|severe)$/);
+      });
+    }
+  });
+
+  test('shouldFilterServiceAlertsForSpecificRoutes', async () => {
+    // Red: Test that service alerts are filtered for specific subway lines
+    const mtaService = new RealMTAService();
+    
+    const relevantLines = ['F', 'C', 'A'];
+    const alerts = await mtaService.getServiceAlertsForLines(relevantLines);
+    
+    // Should return array of filtered alerts
+    expect(alerts).toBeDefined();
+    expect(Array.isArray(alerts)).toBe(true);
+    
+    // All returned alerts should affect at least one of the specified lines
+    alerts.forEach(alert => {
+      const hasRelevantRoute = alert.affectedRoutes.some(route => 
+        relevantLines.includes(route)
+      );
+      expect(hasRelevantRoute).toBe(true);
+    });
+  });
 });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, RefreshControl, useColorScheme, Platform } from 'react-native';
 import { Zap } from 'lucide-react-native';
-import { RealMTAService, Route } from '../../services/RealMTAService';
+import { RealMTAService, Route, ServiceAlert } from '../../services/RealMTAService';
 import { RouteCard } from './RouteCard';
 import { getThemeStyles } from '../../design/components';
 
@@ -28,14 +28,17 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRoutes, setExpandedRoutes] = useState<Set<number>>(new Set());
+  const [serviceAlerts, setServiceAlerts] = useState<ServiceAlert[]>([]);
   
   const mtaService = new RealMTAService();
 
   useEffect(() => {
     loadRoutes();
+    loadServiceAlerts();
     
     const interval = setInterval(() => {
       loadRoutes();
+      loadServiceAlerts();
     }, 30000); // Update every 30 seconds
 
     return () => clearInterval(interval);
@@ -81,9 +84,20 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
     }
   };
 
+  const loadServiceAlerts = async () => {
+    try {
+      const alerts = await mtaService.getServiceAlertsForLines(['F', 'C', 'A']);
+      setServiceAlerts(alerts);
+    } catch (error) {
+      console.error(`[${config.title}] Failed to load service alerts:`, error);
+      setServiceAlerts([]);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadRoutes();
+    await loadServiceAlerts();
     setRefreshing(false);
   };
 
@@ -199,9 +213,28 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
         {routes.length > 0 && (
           <View style={[styles.card(), { marginTop: 20, marginBottom: 40 }]}>
             <Text style={{ color: styles.theme.colors.text, fontSize: 18, fontWeight: '600', marginBottom: 8 }}>Service Alerts</Text>
-            <Text style={{ color: styles.theme.colors.textSecondary, fontSize: 14 }}>
-              No active service alerts for this route
-            </Text>
+            {serviceAlerts.length === 0 ? (
+              <Text style={{ color: styles.theme.colors.textSecondary, fontSize: 14 }}>
+                No active service alerts for this route
+              </Text>
+            ) : (
+              serviceAlerts.map((alert) => (
+                <View key={alert.id} style={{ marginBottom: 12 }}>
+                  <Text style={{ 
+                    color: alert.severity === 'severe' ? styles.theme.colors.error : 
+                           alert.severity === 'warning' ? '#F59E0B' : styles.theme.colors.text,
+                    fontSize: 16, 
+                    fontWeight: '600', 
+                    marginBottom: 4 
+                  }}>
+                    {alert.headerText}
+                  </Text>
+                  <Text style={{ color: styles.theme.colors.textSecondary, fontSize: 14 }}>
+                    {alert.descriptionText}
+                  </Text>
+                </View>
+              ))
+            )}
           </View>
         )}
       </ScrollView>

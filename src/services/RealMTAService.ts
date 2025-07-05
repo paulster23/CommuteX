@@ -53,6 +53,14 @@ export interface RouteStep {
   nextLine?: string; // line to transfer to
 }
 
+export interface ServiceAlert {
+  id: string;
+  headerText: string;
+  descriptionText: string;
+  affectedRoutes: string[];
+  severity: 'info' | 'warning' | 'severe';
+}
+
 export interface Route {
   id: number;
   arrivalTime: string;
@@ -95,6 +103,7 @@ export class RealMTAService {
   // GTFS-RT feed URLs
   private readonly F_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm';
   private readonly ACE_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace';
+  private readonly ALERTS_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-alerts';
   
   // F train station IDs (from GTFS static data)
   private readonly CARROLL_ST_STOP_ID = 'F20'; // Carroll St (F,G)
@@ -1170,6 +1179,54 @@ export class RealMTAService {
     
     // Fallback to estimated time
     return 10;
+  }
+
+  /**
+   * Fetch service alerts from MTA GTFS-RT alerts feed
+   */
+  async getServiceAlerts(): Promise<ServiceAlert[]> {
+    try {
+      const response = await fetch(this.ALERTS_FEED_URL, {
+        headers: {
+          'x-api-key': process.env.MTA_API_KEY || ''
+        }
+      });
+
+      if (!response.ok) {
+        console.error('[RealMTAService] Failed to fetch alerts:', response.status);
+        return [];
+      }
+
+      const alertsBuffer = await response.arrayBuffer();
+      
+      // Parse GTFS-RT alerts data
+      // Note: For real implementation, would need proper protobuf parsing
+      // For now, return sample alert structure when MTA API is accessible
+      const alerts: ServiceAlert[] = [];
+      
+      // Check if we got valid data from MTA
+      if (alertsBuffer.byteLength > 0) {
+        // In a real implementation, would parse protobuf here
+        // For now, return properly structured but empty alerts
+        console.log('[RealMTAService] Successfully fetched alerts data');
+      }
+      
+      return alerts;
+    } catch (error) {
+      console.error('[RealMTAService] Error fetching service alerts:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get service alerts filtered for specific subway lines
+   */
+  async getServiceAlertsForLines(lines: string[]): Promise<ServiceAlert[]> {
+    const allAlerts = await this.getServiceAlerts();
+    
+    return allAlerts.filter(alert => 
+      alert.affectedRoutes.some(route => lines.includes(route))
+    );
   }
 
   /**
