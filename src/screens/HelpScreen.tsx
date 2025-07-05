@@ -48,6 +48,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
   });
 
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [refreshing, setRefreshing] = useState(false);
 
   const gpsProvider = locationProvider || new GPSLocationProvider();
 
@@ -111,6 +112,28 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
     }
   }, [direction, fetchDepartures]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    
+    // Ensure minimum refresh duration for visual feedback
+    const startTime = Date.now();
+    const minRefreshDuration = 500; // 500ms minimum
+    
+    try {
+      await fetchLocation();
+    } catch (error) {
+      console.error('Error during refresh:', error);
+    }
+    
+    // Ensure minimum refresh duration
+    const elapsed = Date.now() - startTime;
+    if (elapsed < minRefreshDuration) {
+      await new Promise(resolve => setTimeout(resolve, minRefreshDuration - elapsed));
+    }
+    
+    setRefreshing(false);
+  }, [fetchLocation]);
+
   useEffect(() => {
     fetchLocation();
   }, [fetchLocation]);
@@ -151,9 +174,12 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
         contentContainerStyle={{ paddingBottom: locationState.nearestStation ? 100 : 20 }}
         refreshControl={
           <RefreshControl 
-            refreshing={locationState.loading} 
-            onRefresh={fetchLocation}
-            tintColor={styles.theme.colors.primary}
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            tintColor={isDarkMode ? styles.theme.colors.success : styles.theme.colors.primary}
+            colors={[styles.theme.colors.success, styles.theme.colors.primary]}
+            progressBackgroundColor={styles.theme.colors.surface}
+            progressViewOffset={20}
           />
         }
       >

@@ -96,8 +96,26 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadRoutes();
-    await loadServiceAlerts();
+    
+    // Ensure minimum refresh duration for visual feedback
+    const startTime = Date.now();
+    const minRefreshDuration = 500; // 500ms minimum
+    
+    try {
+      await Promise.all([
+        loadRoutes(),
+        loadServiceAlerts()
+      ]);
+    } catch (error) {
+      console.error('Error during refresh:', error);
+    }
+    
+    // Ensure minimum refresh duration
+    const elapsed = Date.now() - startTime;
+    if (elapsed < minRefreshDuration) {
+      await new Promise(resolve => setTimeout(resolve, minRefreshDuration - elapsed));
+    }
+    
     setRefreshing(false);
   };
 
@@ -147,15 +165,16 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
         testID={config.title === 'Morning Commute' ? 'scroll-view' : 'afternoon-routes-container'}
         style={{ flex: 1, paddingHorizontal: 8 }}
         showsVerticalScrollIndicator={false}
-        bounces={Platform.OS === 'ios'}
-        alwaysBounceVertical={Platform.OS === 'ios'}
+        bounces={true}
+        alwaysBounceVertical={true}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={styles.theme.colors.primary}
-            colors={[styles.theme.colors.primary]}
+            tintColor={isDarkMode ? styles.theme.colors.success : styles.theme.colors.primary}
+            colors={[styles.theme.colors.success, styles.theme.colors.primary]}
             progressBackgroundColor={styles.theme.colors.surface}
+            progressViewOffset={20}
           />
         }
       >
