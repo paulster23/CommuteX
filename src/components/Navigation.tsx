@@ -43,10 +43,7 @@ export function AppNavigator() {
           backgroundColor: styles.theme.colors.surface,
           borderTopWidth: 1,
           borderTopColor: styles.theme.colors.border,
-          shadowColor: isDarkMode ? '#000' : '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: isDarkMode ? 0.3 : 0.1,
-          shadowRadius: 4,
+          boxShadow: isDarkMode ? '0 -2px 4px rgba(0, 0, 0, 0.3)' : '0 -2px 4px rgba(0, 0, 0, 0.1)',
           elevation: 8,
         },
       })}

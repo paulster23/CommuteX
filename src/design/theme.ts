@@ -181,71 +181,35 @@ export const colors = {
   },
 } as const;
 
-// Neumorphic shadows for modern card design
+// Modern shadows using boxShadow for better performance and modern standards
 export const shadows = {
-  // Light theme neumorphic shadows
+  // Light theme modern shadows
   light: {
     card: {
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.05,
-      shadowRadius: 8,
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
       elevation: 2,
     },
     cardPressed: {
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: 1,
-      },
-      shadowOpacity: 0.03,
-      shadowRadius: 4,
+      boxShadow: '0 1px 4px rgba(0, 0, 0, 0.03)',
       elevation: 1,
     },
     cardElevated: {
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-      shadowOpacity: 0.08,
-      shadowRadius: 12,
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
       elevation: 4,
     },
   },
-  // Dark theme neumorphic shadows
+  // Dark theme modern shadows
   dark: {
     card: {
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
       elevation: 2,
     },
     cardPressed: {
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: 1,
-      },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
+      boxShadow: '0 1px 4px rgba(0, 0, 0, 0.2)',
       elevation: 1,
     },
     cardElevated: {
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-      shadowOpacity: 0.4,
-      shadowRadius: 12,
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
       elevation: 4,
     },
   },

@@ -66,10 +66,7 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
         isBestRoute && { 
           borderWidth: 2, 
           borderColor: styles.theme.colors.success,
-          shadowColor: styles.theme.colors.success,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.2,
-          shadowRadius: 4,
+          boxShadow: '0 2px 4px rgba(52, 199, 89, 0.2)',
           elevation: 4,
         }
       ]}
@@ -221,10 +218,7 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
                     borderWidth: step.type === 'transit' ? 0 : 2,
                     borderColor: step.type === 'transit' ? 'transparent' : styles.theme.colors.border,
                     elevation: 1,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 1,
+                    boxShadow: '0 1px 1px rgba(0, 0, 0, 0.1)',
                   }}>
                     <Text style={{ 
                       fontSize: step.type === 'transit' ? 10 : 12, 
