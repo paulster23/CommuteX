@@ -590,4 +590,68 @@ describe('HelpScreen', () => {
     // - Minimum duration for visual feedback
     expect(mockLocationProvider.getCurrentLocation).toBeDefined();
   });
+
+  test('shouldAutoRefreshDeparturesEvery30Seconds', async () => {
+    // Red: Test that HelpScreen automatically refreshes departure data every 30 seconds
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    importedMockGetDeparturesForStation.mockResolvedValue(mockDepartures);
+    
+    // Mock setInterval and clearInterval
+    const setIntervalSpy = jest.spyOn(global, 'setInterval');
+    const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
+    
+    const { unmount } = render(<HelpScreen locationProvider={mockLocationProvider} />);
+    
+    // Should set up auto-refresh interval
+    expect(setIntervalSpy).toHaveBeenCalledWith(
+      expect.any(Function),
+      30000 // 30 seconds
+    );
+    
+    // Should clean up interval on unmount
+    unmount();
+    expect(clearIntervalSpy).toHaveBeenCalled();
+    
+    setIntervalSpy.mockRestore();
+    clearIntervalSpy.mockRestore();
+  });
+
+  test('shouldUpdateDepartureTimesOnAutoRefresh', async () => {
+    // Red: Test that auto-refresh calls fetchLocation to update departure times
+    jest.useFakeTimers();
+    
+    const mockLocationProvider = {
+      getCurrentLocation: jest.fn().mockResolvedValue(mockLocation)
+    };
+    
+    importedMockFindNearestStation.mockReturnValue(mockNearestStation);
+    importedMockGetDeparturesForStation.mockResolvedValue(mockDepartures);
+    
+    // Track how many times getDeparturesForStation is called
+    const getDeparturesSpy = jest.spyOn(require('../../services/StationDepartureService').StationDepartureService, 'getDeparturesForStation');
+    
+    render(<HelpScreen locationProvider={mockLocationProvider} />);
+    
+    // Wait for initial load
+    await waitFor(() => {
+      expect(mockLocationProvider.getCurrentLocation).toHaveBeenCalledTimes(1);
+    });
+    
+    const initialCallCount = getDeparturesSpy.mock.calls.length;
+    
+    // Fast-forward 30 seconds to trigger auto-refresh
+    jest.advanceTimersByTime(30000);
+    
+    // Should have called departure service again
+    await waitFor(() => {
+      expect(getDeparturesSpy.mock.calls.length).toBeGreaterThan(initialCallCount);
+    });
+    
+    getDeparturesSpy.mockRestore();
+    jest.useRealTimers();
+  });
 });

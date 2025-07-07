@@ -142,6 +142,13 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
 
   useEffect(() => {
     fetchLocation();
+    
+    // Auto-refresh every 30 seconds to keep departure times current
+    const interval = setInterval(() => {
+      fetchLocation();
+    }, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
   }, [fetchLocation]);
 
   // Handle direction changes
