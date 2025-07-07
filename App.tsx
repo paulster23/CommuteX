@@ -21,6 +21,27 @@ export default function App() {
         );
       }
 
+      // Hide vertical scroll bar for cleaner PWA appearance
+      const style = document.createElement('style');
+      style.textContent = `
+        /* Hide scrollbar for webkit browsers */
+        ::-webkit-scrollbar {
+          display: none;
+        }
+        
+        /* Hide scrollbar for Firefox */
+        * {
+          scrollbar-width: none;
+        }
+        
+        /* Ensure content is still scrollable */
+        body, html {
+          overflow-x: hidden;
+          -ms-overflow-style: none;
+        }
+      `;
+      document.head.appendChild(style);
+
       // Set PWA display mode styles
       if (window.matchMedia('(display-mode: standalone)').matches) {
         document.body.style.userSelect = 'none';
