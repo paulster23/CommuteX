@@ -95,19 +95,30 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
   };
 
   const onRefresh = async () => {
+    console.log('[CommuteAppBase] Pull-to-refresh triggered for', config.title);
+    console.log('[CommuteAppBase] Platform info:', {
+      OS: Platform.OS,
+      Version: Platform.Version,
+      isWeb: Platform.OS === 'web',
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A'
+    });
+    
     setRefreshing(true);
+    console.log('[CommuteAppBase] Refresh state set to true');
     
     // Ensure minimum refresh duration for visual feedback
     const startTime = Date.now();
     const minRefreshDuration = 500; // 500ms minimum
     
     try {
+      console.log('[CommuteAppBase] Starting loadRoutes and loadServiceAlerts...');
       await Promise.all([
         loadRoutes(),
         loadServiceAlerts()
       ]);
+      console.log('[CommuteAppBase] Data loading completed successfully');
     } catch (error) {
-      console.error('Error during refresh:', error);
+      console.error('[CommuteAppBase] Error during refresh:', error);
     }
     
     // Ensure minimum refresh duration
@@ -116,6 +127,7 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
       await new Promise(resolve => setTimeout(resolve, minRefreshDuration - elapsed));
     }
     
+    console.log('[CommuteAppBase] Refresh completed, setting state to false');
     setRefreshing(false);
   };
 
@@ -151,6 +163,25 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
             <Text style={{ fontSize: 10, color: styles.theme.colors.textSecondary }}>
               {lastUpdated.toLocaleTimeString()}
             </Text>
+            
+            {/* Manual refresh button for web/PWA debugging */}
+            {Platform.OS === 'web' && (
+              <TouchableOpacity
+                onPress={() => {
+                  console.log('[CommuteAppBase] Manual refresh button pressed for', config.title);
+                  onRefresh();
+                }}
+                style={{
+                  marginLeft: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  backgroundColor: styles.theme.colors.primary,
+                  borderRadius: 4
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 10 }}>↻ Refresh</Text>
+              </TouchableOpacity>
+            )}
           </View>
           
           <Text style={[styles.header.title, { fontSize: 24 }]}>{config.title}</Text>
@@ -170,7 +201,10 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
+            onRefresh={() => {
+              console.log('[CommuteAppBase] RefreshControl onRefresh callback triggered for', config.title);
+              onRefresh();
+            }}
             tintColor={isDarkMode ? styles.theme.colors.success : styles.theme.colors.primary}
             colors={[styles.theme.colors.success, styles.theme.colors.primary]}
             progressBackgroundColor={styles.theme.colors.surface}

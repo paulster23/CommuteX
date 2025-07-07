@@ -119,16 +119,27 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
   }, [direction, fetchDepartures]);
 
   const onRefresh = useCallback(async () => {
+    console.log('[HelpScreen] Pull-to-refresh triggered');
+    console.log('[HelpScreen] Platform info:', {
+      OS: Platform.OS,
+      Version: Platform.Version,
+      isWeb: Platform.OS === 'web',
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A'
+    });
+    
     setRefreshing(true);
+    console.log('[HelpScreen] Refresh state set to true');
     
     // Ensure minimum refresh duration for visual feedback
     const startTime = Date.now();
     const minRefreshDuration = 500; // 500ms minimum
     
     try {
+      console.log('[HelpScreen] Starting fetchLocation...');
       await fetchLocation();
+      console.log('[HelpScreen] fetchLocation completed successfully');
     } catch (error) {
-      console.error('Error during refresh:', error);
+      console.error('[HelpScreen] Error during refresh:', error);
     }
     
     // Ensure minimum refresh duration
@@ -137,6 +148,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
       await new Promise(resolve => setTimeout(resolve, minRefreshDuration - elapsed));
     }
     
+    console.log('[HelpScreen] Refresh completed, setting state to false');
     setRefreshing(false);
   }, [fetchLocation]);
 
@@ -147,6 +159,41 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
     const interval = setInterval(() => {
       fetchLocation();
     }, 30000); // Update every 30 seconds
+
+    // Add touch event debugging for web platforms
+    if (Platform.OS === 'web') {
+      console.log('[HelpScreen] Setting up touch event debugging for web');
+      
+      const handleTouchStart = (e: TouchEvent) => {
+        console.log('[HelpScreen] TouchStart detected:', {
+          touches: e.touches.length,
+          type: e.type,
+          target: e.target?.tagName
+        });
+      };
+      
+      const handleTouchMove = (e: TouchEvent) => {
+        console.log('[HelpScreen] TouchMove detected:', {
+          touches: e.touches.length,
+          deltaY: e.touches[0]?.clientY
+        });
+      };
+      
+      const handleTouchEnd = (e: TouchEvent) => {
+        console.log('[HelpScreen] TouchEnd detected');
+      };
+      
+      document.addEventListener('touchstart', handleTouchStart);
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('touchend', handleTouchEnd);
+      
+      return () => {
+        clearInterval(interval);
+        document.removeEventListener('touchstart', handleTouchStart);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
 
     return () => clearInterval(interval);
   }, [fetchLocation]);
@@ -198,7 +245,10 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
-            onRefresh={onRefresh}
+            onRefresh={() => {
+              console.log('[HelpScreen] RefreshControl onRefresh callback triggered');
+              onRefresh();
+            }}
             tintColor={isDarkMode ? styles.theme.colors.success : styles.theme.colors.primary}
             colors={[styles.theme.colors.success, styles.theme.colors.primary]}
             progressBackgroundColor={styles.theme.colors.surface}
@@ -218,6 +268,25 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
               <Text style={{ fontSize: 10, color: styles.theme.colors.textSecondary }}>
                 {lastUpdated.toLocaleTimeString()}
               </Text>
+              
+              {/* Manual refresh button for web/PWA debugging */}
+              {Platform.OS === 'web' && (
+                <TouchableOpacity
+                  onPress={() => {
+                    console.log('[HelpScreen] Manual refresh button pressed');
+                    onRefresh();
+                  }}
+                  style={{
+                    marginLeft: 8,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    backgroundColor: styles.theme.colors.primary,
+                    borderRadius: 4
+                  }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 10 }}>↻ Refresh</Text>
+                </TouchableOpacity>
+              )}
             </View>
             
             <Text style={[styles.header.title, { fontSize: 24 }]}>Nearest Station</Text>
