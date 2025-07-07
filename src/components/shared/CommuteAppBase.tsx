@@ -29,6 +29,7 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
   const [error, setError] = useState<string | null>(null);
   const [expandedRoutes, setExpandedRoutes] = useState<Set<number>>(new Set());
   const [serviceAlerts, setServiceAlerts] = useState<ServiceAlert[]>([]);
+  const [debugMessage, setDebugMessage] = useState<string>('');
   
   const mtaService = new RealMTAService();
 
@@ -68,13 +69,12 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
       });
       
       setRoutes(routeData);
+      setLastUpdated(new Date()); // Update timestamp when routes are loaded
       
       // Expand the first route (earliest arrival time) by default
       if (routeData.length > 0) {
         setExpandedRoutes(new Set([routeData[0].id]));
       }
-      
-      setLastUpdated(new Date());
     } catch (error) {
       console.error(`[DEBUG ${config.title}] Failed to load routes:`, error);
       setError(error instanceof Error ? error.message : `Unable to load ${config.title.toLowerCase()} MTA data`);
@@ -104,6 +104,7 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
     });
     
     setRefreshing(true);
+    setDebugMessage('Refreshing data...');
     console.log('[CommuteAppBase] Refresh state set to true');
     
     // Ensure minimum refresh duration for visual feedback
@@ -117,8 +118,10 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
         loadServiceAlerts()
       ]);
       console.log('[CommuteAppBase] Data loading completed successfully');
+      setDebugMessage('Refresh complete!');
     } catch (error) {
       console.error('[CommuteAppBase] Error during refresh:', error);
+      setDebugMessage('Refresh failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
     
     // Ensure minimum refresh duration
@@ -129,6 +132,9 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
     
     console.log('[CommuteAppBase] Refresh completed, setting state to false');
     setRefreshing(false);
+    
+    // Clear debug message after 2 seconds
+    setTimeout(() => setDebugMessage(''), 2000);
   };
 
   const toggleRouteExpansion = (routeId: number) => {
@@ -164,22 +170,36 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
               {lastUpdated.toLocaleTimeString()}
             </Text>
             
+            {/* Debug message for mobile PWA debugging */}
+            {Platform.OS === 'web' && debugMessage && (
+              <Text style={{ fontSize: 10, color: styles.theme.colors.success, marginLeft: 8 }}>
+                {debugMessage}
+              </Text>
+            )}
+            
             {/* Manual refresh button for web/PWA debugging */}
             {Platform.OS === 'web' && (
               <TouchableOpacity
-                onPress={() => {
+                onPress={async () => {
                   console.log('[CommuteAppBase] Manual refresh button pressed for', config.title);
-                  onRefresh();
+                  try {
+                    await onRefresh();
+                    console.log('[CommuteAppBase] Manual refresh completed successfully');
+                  } catch (error) {
+                    console.error('[CommuteAppBase] Manual refresh failed:', error);
+                  }
                 }}
                 style={{
                   marginLeft: 8,
                   paddingHorizontal: 8,
                   paddingVertical: 4,
-                  backgroundColor: styles.theme.colors.primary,
+                  backgroundColor: refreshing ? styles.theme.colors.success : styles.theme.colors.primary,
                   borderRadius: 4
                 }}
               >
-                <Text style={{ color: '#FFFFFF', fontSize: 10 }}>↻ Refresh</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 10 }}>
+                  {refreshing ? '⟳ Loading...' : '↻ Refresh'}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
