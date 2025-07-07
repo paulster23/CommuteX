@@ -51,6 +51,13 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
 
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
+  const [debugMessage, setDebugMessage] = useState<string>('');
+  const [webPullToRefresh, setWebPullToRefresh] = useState({
+    startY: 0,
+    currentY: 0,
+    isDragging: false,
+    threshold: 80 // pixels to trigger refresh
+  });
 
   const gpsProvider = locationProvider || new GPSLocationProvider();
 
@@ -128,6 +135,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
     });
     
     setRefreshing(true);
+    setDebugMessage('Refreshing location...');
     console.log('[HelpScreen] Refresh state set to true');
     
     // Ensure minimum refresh duration for visual feedback
@@ -138,8 +146,10 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
       console.log('[HelpScreen] Starting fetchLocation...');
       await fetchLocation();
       console.log('[HelpScreen] fetchLocation completed successfully');
+      setDebugMessage('Refresh complete!');
     } catch (error) {
       console.error('[HelpScreen] Error during refresh:', error);
+      setDebugMessage('Refresh failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
     
     // Ensure minimum refresh duration
@@ -150,6 +160,9 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
     
     console.log('[HelpScreen] Refresh completed, setting state to false');
     setRefreshing(false);
+    
+    // Clear debug message after 2 seconds
+    setTimeout(() => setDebugMessage(''), 2000);
   }, [fetchLocation]);
 
   useEffect(() => {
@@ -198,6 +211,64 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
     return () => clearInterval(interval);
   }, [fetchLocation]);
 
+  // Web-specific pull-to-refresh handlers
+  const handleWebTouchStart = useCallback((e: any) => {
+    if (Platform.OS === 'web' && e.touches && e.touches.length === 1) {
+      const touch = e.touches[0];
+      setWebPullToRefresh(prev => ({
+        ...prev,
+        startY: touch.clientY,
+        currentY: touch.clientY,
+        isDragging: true
+      }));
+      console.log('[HelpScreen] Web pull-to-refresh started at Y:', touch.clientY);
+    }
+  }, []);
+
+  const handleWebTouchMove = useCallback((e: any) => {
+    if (Platform.OS === 'web' && webPullToRefresh.isDragging && e.touches && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const deltaY = touch.clientY - webPullToRefresh.startY;
+      
+      if (deltaY > 0) { // Only track downward pulls
+        setWebPullToRefresh(prev => ({
+          ...prev,
+          currentY: touch.clientY
+        }));
+        
+        const pullDistance = Math.max(0, deltaY);
+        console.log('[HelpScreen] Web pull distance:', pullDistance);
+        
+        if (pullDistance > webPullToRefresh.threshold) {
+          setDebugMessage(`Pull to refresh (${Math.round(pullDistance)}px)`);
+        }
+      }
+    }
+  }, [webPullToRefresh.isDragging, webPullToRefresh.startY, webPullToRefresh.threshold]);
+
+  const handleWebTouchEnd = useCallback(async () => {
+    if (Platform.OS === 'web' && webPullToRefresh.isDragging) {
+      const pullDistance = webPullToRefresh.currentY - webPullToRefresh.startY;
+      
+      console.log('[HelpScreen] Web pull-to-refresh ended, distance:', pullDistance);
+      
+      if (pullDistance > webPullToRefresh.threshold) {
+        console.log('[HelpScreen] Web pull-to-refresh threshold reached, triggering refresh');
+        setDebugMessage('Web pull-to-refresh triggered!');
+        await onRefresh();
+      } else {
+        setDebugMessage('');
+      }
+      
+      setWebPullToRefresh(prev => ({
+        ...prev,
+        isDragging: false,
+        startY: 0,
+        currentY: 0
+      }));
+    }
+  }, [webPullToRefresh, onRefresh]);
+
   // Handle direction changes
   useEffect(() => {
     if (locationState.nearestStation && !locationState.loading) {
@@ -243,18 +314,23 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
         style={screenStyles.content}
         contentContainerStyle={{ paddingBottom: locationState.nearestStation ? 100 : 20 }}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={() => {
-              console.log('[HelpScreen] RefreshControl onRefresh callback triggered');
-              onRefresh();
-            }}
-            tintColor={isDarkMode ? styles.theme.colors.success : styles.theme.colors.primary}
-            colors={[styles.theme.colors.success, styles.theme.colors.primary]}
-            progressBackgroundColor={styles.theme.colors.surface}
-            progressViewOffset={20}
-          />
+          Platform.OS !== 'web' ? (
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={() => {
+                console.log('[HelpScreen] RefreshControl onRefresh callback triggered');
+                onRefresh();
+              }}
+              tintColor={isDarkMode ? styles.theme.colors.success : styles.theme.colors.primary}
+              colors={[styles.theme.colors.success, styles.theme.colors.primary]}
+              progressBackgroundColor={styles.theme.colors.surface}
+              progressViewOffset={20}
+            />
+          ) : undefined
         }
+        onTouchStart={Platform.OS === 'web' ? handleWebTouchStart : undefined}
+        onTouchMove={Platform.OS === 'web' ? handleWebTouchMove : undefined}
+        onTouchEnd={Platform.OS === 'web' ? handleWebTouchEnd : undefined}
       >
         {/* Header */}
         <View style={styles.header.container}>
@@ -269,22 +345,36 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                 {lastUpdated.toLocaleTimeString()}
               </Text>
               
+              {/* Debug message for mobile PWA debugging */}
+              {Platform.OS === 'web' && debugMessage && (
+                <Text style={{ fontSize: 10, color: styles.theme.colors.success, marginLeft: 8 }}>
+                  {debugMessage}
+                </Text>
+              )}
+              
               {/* Manual refresh button for web/PWA debugging */}
               {Platform.OS === 'web' && (
                 <TouchableOpacity
-                  onPress={() => {
+                  onPress={async () => {
                     console.log('[HelpScreen] Manual refresh button pressed');
-                    onRefresh();
+                    try {
+                      await onRefresh();
+                      console.log('[HelpScreen] Manual refresh completed successfully');
+                    } catch (error) {
+                      console.error('[HelpScreen] Manual refresh failed:', error);
+                    }
                   }}
                   style={{
                     marginLeft: 8,
                     paddingHorizontal: 8,
                     paddingVertical: 4,
-                    backgroundColor: styles.theme.colors.primary,
+                    backgroundColor: refreshing ? styles.theme.colors.success : styles.theme.colors.primary,
                     borderRadius: 4
                   }}
                 >
-                  <Text style={{ color: '#FFFFFF', fontSize: 10 }}>↻ Refresh</Text>
+                  <Text style={{ color: '#FFFFFF', fontSize: 10 }}>
+                    {refreshing ? '⟳ Loading...' : '↻ Refresh'}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>

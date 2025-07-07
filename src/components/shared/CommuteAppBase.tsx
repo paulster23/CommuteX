@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, RefreshControl, useColorScheme, Platform } from 'react-native';
 import { Zap } from 'lucide-react-native';
 import { RealMTAService, Route, ServiceAlert } from '../../services/RealMTAService';
@@ -30,6 +30,12 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
   const [expandedRoutes, setExpandedRoutes] = useState<Set<number>>(new Set());
   const [serviceAlerts, setServiceAlerts] = useState<ServiceAlert[]>([]);
   const [debugMessage, setDebugMessage] = useState<string>('');
+  const [webPullToRefresh, setWebPullToRefresh] = useState({
+    startY: 0,
+    currentY: 0,
+    isDragging: false,
+    threshold: 80 // pixels to trigger refresh
+  });
   
   const mtaService = new RealMTAService();
 
@@ -137,6 +143,64 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
     setTimeout(() => setDebugMessage(''), 2000);
   };
 
+  // Web-specific pull-to-refresh handlers
+  const handleWebTouchStart = useCallback((e: any) => {
+    if (Platform.OS === 'web' && e.touches && e.touches.length === 1) {
+      const touch = e.touches[0];
+      setWebPullToRefresh(prev => ({
+        ...prev,
+        startY: touch.clientY,
+        currentY: touch.clientY,
+        isDragging: true
+      }));
+      console.log('[CommuteAppBase] Web pull-to-refresh started at Y:', touch.clientY);
+    }
+  }, []);
+
+  const handleWebTouchMove = useCallback((e: any) => {
+    if (Platform.OS === 'web' && webPullToRefresh.isDragging && e.touches && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const deltaY = touch.clientY - webPullToRefresh.startY;
+      
+      if (deltaY > 0) { // Only track downward pulls
+        setWebPullToRefresh(prev => ({
+          ...prev,
+          currentY: touch.clientY
+        }));
+        
+        const pullDistance = Math.max(0, deltaY);
+        console.log('[CommuteAppBase] Web pull distance:', pullDistance);
+        
+        if (pullDistance > webPullToRefresh.threshold) {
+          setDebugMessage(`Pull to refresh (${Math.round(pullDistance)}px)`);
+        }
+      }
+    }
+  }, [webPullToRefresh.isDragging, webPullToRefresh.startY, webPullToRefresh.threshold]);
+
+  const handleWebTouchEnd = useCallback(async () => {
+    if (Platform.OS === 'web' && webPullToRefresh.isDragging) {
+      const pullDistance = webPullToRefresh.currentY - webPullToRefresh.startY;
+      
+      console.log('[CommuteAppBase] Web pull-to-refresh ended, distance:', pullDistance);
+      
+      if (pullDistance > webPullToRefresh.threshold) {
+        console.log('[CommuteAppBase] Web pull-to-refresh threshold reached, triggering refresh');
+        setDebugMessage('Web pull-to-refresh triggered!');
+        await onRefresh();
+      } else {
+        setDebugMessage('');
+      }
+      
+      setWebPullToRefresh(prev => ({
+        ...prev,
+        isDragging: false,
+        startY: 0,
+        currentY: 0
+      }));
+    }
+  }, [webPullToRefresh, onRefresh]);
+
   const toggleRouteExpansion = (routeId: number) => {
     const newExpanded = new Set(expandedRoutes);
     if (newExpanded.has(routeId)) {
@@ -174,6 +238,13 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
             {Platform.OS === 'web' && debugMessage && (
               <Text style={{ fontSize: 10, color: styles.theme.colors.success, marginLeft: 8 }}>
                 {debugMessage}
+              </Text>
+            )}
+            
+            {/* Web pull-to-refresh distance indicator */}
+            {Platform.OS === 'web' && webPullToRefresh.isDragging && (
+              <Text style={{ fontSize: 10, color: styles.theme.colors.primary, marginLeft: 8 }}>
+                Pull: {Math.round(webPullToRefresh.currentY - webPullToRefresh.startY)}px
               </Text>
             )}
             
@@ -219,18 +290,23 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
         bounces={true}
         alwaysBounceVertical={true}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              console.log('[CommuteAppBase] RefreshControl onRefresh callback triggered for', config.title);
-              onRefresh();
-            }}
-            tintColor={isDarkMode ? styles.theme.colors.success : styles.theme.colors.primary}
-            colors={[styles.theme.colors.success, styles.theme.colors.primary]}
-            progressBackgroundColor={styles.theme.colors.surface}
-            progressViewOffset={20}
-          />
+          Platform.OS !== 'web' ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                console.log('[CommuteAppBase] RefreshControl onRefresh callback triggered for', config.title);
+                onRefresh();
+              }}
+              tintColor={isDarkMode ? styles.theme.colors.success : styles.theme.colors.primary}
+              colors={[styles.theme.colors.success, styles.theme.colors.primary]}
+              progressBackgroundColor={styles.theme.colors.surface}
+              progressViewOffset={20}
+            />
+          ) : undefined
         }
+        onTouchStart={Platform.OS === 'web' ? handleWebTouchStart : undefined}
+        onTouchMove={Platform.OS === 'web' ? handleWebTouchMove : undefined}
+        onTouchEnd={Platform.OS === 'web' ? handleWebTouchEnd : undefined}
       >
 
         {/* Routes */}
