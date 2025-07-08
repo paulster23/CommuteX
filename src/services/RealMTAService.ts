@@ -1423,9 +1423,10 @@ export class RealMTAService {
 
   /**
    * Get service alerts filtered for specific subway lines
+   * Only returns currently active alerts
    */
   async getServiceAlertsForLines(lines: string[]): Promise<ServiceAlert[]> {
-    const allAlerts = await this.getServiceAlerts();
+    const allAlerts = await this.getActiveServiceAlerts();
     
     return allAlerts.filter(alert => 
       alert.affectedRoutes.some(route => lines.includes(route))
@@ -1434,9 +1435,10 @@ export class RealMTAService {
 
   /**
    * Get service alerts filtered for specific direction (0=outbound, 1=inbound)
+   * Only returns currently active alerts
    */
   async getServiceAlertsForDirection(lines: string[], direction: 0 | 1): Promise<ServiceAlert[]> {
-    const allAlerts = await this.getServiceAlerts();
+    const allAlerts = await this.getActiveServiceAlerts();
     
     return allAlerts.filter(alert => {
       // Check if alert affects any of the specified lines
@@ -1459,9 +1461,10 @@ export class RealMTAService {
 
   /**
    * Get service alerts filtered for specific stations
+   * Only returns currently active alerts
    */
   async getServiceAlertsForStations(stationIds: string[]): Promise<ServiceAlert[]> {
-    const allAlerts = await this.getServiceAlerts();
+    const allAlerts = await this.getActiveServiceAlerts();
     
     return allAlerts.filter(alert => 
       alert.informedEntities.some(entity => 
@@ -1477,13 +1480,14 @@ export class RealMTAService {
   /**
    * Get service alerts for specific commute route
    * Filters by lines, direction, and stations on the route
+   * Only returns currently active alerts
    */
   async getServiceAlertsForCommute(
     lines: string[], 
     direction: 0 | 1, 
     stationIds: string[]
   ): Promise<ServiceAlert[]> {
-    const allAlerts = await this.getServiceAlerts();
+    const allAlerts = await this.getActiveServiceAlerts(); // Use active alerts instead of all alerts
     
     return allAlerts.filter(alert => {
       // Must affect at least one of our lines
@@ -1513,6 +1517,7 @@ export class RealMTAService {
 
   /**
    * Check if a route is affected by service alerts and return alert information
+   * Enhanced with user route awareness and severity escalation
    */
   async checkRouteForAlerts(route: Route, direction: 0 | 1): Promise<{
     hasAlerts: boolean;
@@ -1550,25 +1555,52 @@ export class RealMTAService {
       direction,
       routeStations
     );
-    
-    // Determine highest severity
+
+    // Enhanced severity analysis with user route awareness
     let highestSeverity: 'info' | 'warning' | 'severe' | undefined;
+    const userRouteAlerts: ServiceAlert[] = [];
+    
     if (alerts.length > 0) {
-      const severities = alerts.map(alert => alert.severity);
-      if (severities.includes('severe')) {
+      for (const alert of alerts) {
+        // Check if this alert affects user's route stations
+        const affectsUserRoute = await this.isUserRouteAffected(alert, direction);
+        
+        if (affectsUserRoute) {
+          userRouteAlerts.push(alert);
+          // Escalate severity when user's route stations are affected
+          if (alert.severity === 'info' || alert.severity === 'warning') {
+            // User route impact escalates any alert to severe
+            highestSeverity = 'severe';
+          } else {
+            highestSeverity = alert.severity;
+          }
+        } else {
+          // Non-user route alerts keep original severity
+          if (!highestSeverity || this.compareSeverity(alert.severity, highestSeverity) > 0) {
+            highestSeverity = alert.severity;
+          }
+        }
+      }
+      
+      // If we have user route alerts, use the escalated severity
+      if (userRouteAlerts.length > 0 && highestSeverity !== 'severe') {
         highestSeverity = 'severe';
-      } else if (severities.includes('warning')) {
-        highestSeverity = 'warning';
-      } else {
-        highestSeverity = 'info';
       }
     }
     
     return {
       hasAlerts: alerts.length > 0,
       severity: highestSeverity,
-      alerts
+      alerts: userRouteAlerts.length > 0 ? userRouteAlerts : alerts // Prioritize user route alerts
     };
+  }
+
+  /**
+   * Compare severity levels for sorting (higher number = more severe)
+   */
+  private compareSeverity(a: 'info' | 'warning' | 'severe', b: 'info' | 'warning' | 'severe'): number {
+    const severityOrder = { 'info': 1, 'warning': 2, 'severe': 3 };
+    return severityOrder[a] - severityOrder[b];
   }
 
   /**
@@ -1605,6 +1637,74 @@ export class RealMTAService {
     }
     
     return enrichedRoutes;
+  }
+
+  /**
+   * Get only currently active service alerts (filtered by activePeriod)
+   */
+  async getActiveServiceAlerts(): Promise<ServiceAlert[]> {
+    const allAlerts = await this.getServiceAlerts();
+    const now = new Date();
+    
+    return allAlerts.filter(alert => {
+      // If no activePeriod is specified, treat as always active
+      if (!alert.activePeriod) {
+        return true;
+      }
+      
+      const { start, end } = alert.activePeriod;
+      
+      // Alert is active if current time is between start and end
+      const isActive = (!start || now >= start) && (!end || now <= end);
+      
+      return isActive;
+    });
+  }
+
+  /**
+   * Get all stations that could be part of user's possible routes
+   * Includes F-direct, F→C transfer, and F→A→C triple-transfer routes
+   */
+  async getUserRouteStations(): Promise<string[]> {
+    const stations = new Set<string>();
+
+    // F-direct route stations: Carroll St → Jay St → 23rd St
+    stations.add('F20'); // Carroll St (origin)
+    stations.add('F24'); // Bergen St (intermediate on F line)
+    stations.add('F25'); // Jay St-MetroTech (F line)
+    stations.add('F18'); // 23rd St (F line destination)
+
+    // F→C transfer route stations: Carroll St → Jay St → 23rd St-8th Ave
+    stations.add('A41'); // Jay St-MetroTech (A/C line)
+    stations.add('A23'); // 23rd St-8th Ave (C line destination)
+
+    // F→A→C triple-transfer route stations: Carroll St → Jay St → 14th St → 23rd St-8th Ave
+    stations.add('A27'); // 14th St-8th Ave (A/C transfer point)
+
+    return Array.from(stations);
+  }
+
+  /**
+   * Check if a service alert affects any of the user's possible route stations
+   */
+  async isUserRouteAffected(alert: ServiceAlert, direction: 0 | 1): Promise<boolean> {
+    const userStations = await this.getUserRouteStations();
+    
+    // Check if alert affects any user route station in the relevant direction
+    return alert.informedEntities.some(entity => {
+      // Check if it's the right direction (or no direction specified)
+      const directionMatch = entity.directionId === undefined || entity.directionId === direction;
+      
+      // Check if it affects a user route station
+      const stationMatch = entity.stopId && userStations.some(stationId => {
+        // Match exact station ID or directional variants
+        return entity.stopId === stationId ||
+               entity.stopId === `${stationId}N` ||
+               entity.stopId === `${stationId}S`;
+      });
+
+      return directionMatch && stationMatch;
+    });
   }
 
   /**
