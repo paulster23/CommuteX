@@ -55,12 +55,26 @@ export interface RouteStep {
   nextLine?: string; // line to transfer to
 }
 
+export interface InformedEntity {
+  agencyId?: string;
+  routeId?: string;
+  routeType?: number;
+  directionId?: number; // 0 = outbound, 1 = inbound
+  stopId?: string;
+  tripId?: string;
+}
+
 export interface ServiceAlert {
   id: string;
   headerText: string;
   descriptionText: string;
   affectedRoutes: string[];
   severity: 'info' | 'warning' | 'severe';
+  informedEntities: InformedEntity[];
+  activePeriod?: {
+    start?: Date;
+    end?: Date;
+  };
 }
 
 export interface Route {
@@ -81,6 +95,8 @@ export interface Route {
   finalWalkingTime: number; // Always 8 minutes to destination
   transitTime: number; // F train travel time from Carroll St to 23rd St
   steps: RouteStep[];
+  hasServiceAlerts?: boolean; // Whether this route is affected by service alerts
+  alertSeverity?: 'info' | 'warning' | 'severe'; // Highest severity alert affecting this route
 }
 
 export interface GTFSData {
@@ -105,7 +121,8 @@ export class RealMTAService {
   // GTFS-RT feed URLs
   private readonly F_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm';
   private readonly ACE_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace';
-  private readonly ALERTS_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-alerts';
+  private readonly ALERTS_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts';
+  private readonly ALERTS_FEED_URL_FALLBACK = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-alerts';
   
   // Dynamic station ID getters using StationDatabase
   public getCarrollStStopId(): string {
@@ -173,8 +190,11 @@ export class RealMTAService {
       // Limit to 5 routes
       const limitedRoutes = allRoutes.slice(0, 5);
       
-      console.log(`[RealMTAService] Generated ${limitedRoutes.length} total routes (from ${directRoutes.length} direct, ${transferRoutes.length} transfer, ${tripleTransferRoutes.length} triple-transfer)`);
-      return limitedRoutes;
+      // Enrich routes with service alert information (morning = direction 0 = southbound)
+      const enrichedRoutes = await this.enrichRoutesWithAlerts(limitedRoutes, 0);
+      
+      console.log(`[RealMTAService] Generated ${enrichedRoutes.length} total routes (from ${directRoutes.length} direct, ${transferRoutes.length} transfer, ${tripleTransferRoutes.length} triple-transfer)`);
+      return enrichedRoutes;
       
     } catch (error) {
       console.error('[RealMTAService] Failed to calculate all routes:', error);
@@ -535,8 +555,11 @@ export class RealMTAService {
       // Limit to 5 routes
       const limitedRoutes = allRoutes.slice(0, 5);
       
-      console.log(`[RealMTAService] Generated ${limitedRoutes.length} total afternoon routes (from ${directRoutes.length} direct, ${transferRoutes.length} transfer, ${tripleTransferRoutes.length} triple-transfer)`);
-      return limitedRoutes;
+      // Enrich routes with service alert information (afternoon = direction 1 = northbound)
+      const enrichedRoutes = await this.enrichRoutesWithAlerts(limitedRoutes, 1);
+      
+      console.log(`[RealMTAService] Generated ${enrichedRoutes.length} total afternoon routes (from ${directRoutes.length} direct, ${transferRoutes.length} transfer, ${tripleTransferRoutes.length} triple-transfer)`);
+      return enrichedRoutes;
       
     } catch (error) {
       console.error('[RealMTAService] Failed to calculate all afternoon routes:', error);
@@ -1253,38 +1276,147 @@ export class RealMTAService {
   }
 
   /**
-   * Fetch service alerts from MTA GTFS-RT alerts feed
+   * Fetch service alerts from MTA GTFS-RT alerts feed with fallback URL
    */
   async getServiceAlerts(): Promise<ServiceAlert[]> {
-    try {
-      const response = await fetch(this.ALERTS_FEED_URL, {
-        headers: {
-          'x-api-key': process.env.MTA_API_KEY || ''
-        }
-      });
-
-      if (!response.ok) {
-        console.error('[RealMTAService] Failed to fetch alerts:', response.status);
-        return [];
-      }
-
-      const alertsBuffer = await response.arrayBuffer();
+    // Try primary URL first, then fallback URL
+    const urlsToTry = [this.ALERTS_FEED_URL, this.ALERTS_FEED_URL_FALLBACK];
+    
+    for (let i = 0; i < urlsToTry.length; i++) {
+      const url = urlsToTry[i];
+      const isLastUrl = i === urlsToTry.length - 1;
       
-      // Parse GTFS-RT alerts data
-      // Note: For real implementation, would need proper protobuf parsing
-      // For now, return sample alert structure when MTA API is accessible
+      try {
+        console.log(`[RealMTAService] Fetching alerts from ${i === 0 ? 'primary' : 'fallback'} URL`);
+        
+        // MTA feeds are public and don't require API key
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          console.error(`[RealMTAService] Failed to fetch alerts from ${url}:`, response.status);
+          if (isLastUrl) return [];
+          continue; // Try next URL
+        }
+
+        const alertsBuffer = await response.arrayBuffer();
+        
+        // Check if response is XML error (not protobuf)
+        const firstBytes = new Uint8Array(alertsBuffer.slice(0, 10));
+        const startsWithXml = firstBytes[0] === 0x3C && firstBytes[1] === 0x3F; // "<?xml"
+        
+        if (startsWithXml) {
+          const errorText = new TextDecoder().decode(alertsBuffer.slice(0, 200));
+          console.error(`[RealMTAService] Received XML error response from ${url}:`, errorText);
+          if (isLastUrl) return [];
+          continue; // Try next URL
+        }
+        
+        // Parse GTFS-RT alerts data using protobuf parsing
+        return await this.parseAlertsBuffer(alertsBuffer);
+        
+      } catch (error) {
+        console.error(`[RealMTAService] Error fetching service alerts from ${url}:`, error);
+        if (isLastUrl) return [];
+        // Try next URL
+      }
+    }
+    
+    return [];
+  }
+
+  /**
+   * Parse GTFS-RT alerts protobuf buffer and extract service alerts
+   */
+  async parseAlertsBuffer(alertsBuffer: ArrayBuffer): Promise<ServiceAlert[]> {
+    console.log(`[RealMTAService] Parsing GTFS-RT alerts protobuf data`);
+    console.log(`[RealMTAService] Buffer size: ${alertsBuffer.byteLength} bytes`);
+    
+    if (alertsBuffer.byteLength === 0) {
+      console.log(`[RealMTAService] Empty alerts buffer received`);
+      return [];
+    }
+    
+    try {
+      // Parse real GTFS-RT alerts protobuf data
+      const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(
+        new Uint8Array(alertsBuffer)
+      );
+      
+      console.log(`[RealMTAService] Alerts feed contains ${feed.entity.length} entities`);
+      
       const alerts: ServiceAlert[] = [];
       
-      // Check if we got valid data from MTA
-      if (alertsBuffer.byteLength > 0) {
-        // In a real implementation, would parse protobuf here
-        // For now, return properly structured but empty alerts
-        console.log('[RealMTAService] Successfully fetched alerts data');
+      // Process each entity in the feed
+      for (const entity of feed.entity) {
+        if (!entity.alert) {
+          continue;
+        }
+        
+        const alert = entity.alert;
+        
+        // Extract basic alert information
+        const headerText = alert.headerText?.translation?.[0]?.text || 'Service Alert';
+        const descriptionText = alert.descriptionText?.translation?.[0]?.text || 'Check MTA website for details';
+        
+        // Extract affected routes and detailed informed entities
+        const affectedRoutes: string[] = [];
+        const informedEntities: InformedEntity[] = [];
+        if (alert.informedEntity) {
+          for (const entity of alert.informedEntity) {
+            const informedEntity: InformedEntity = {
+              agencyId: entity.agencyId || undefined,
+              routeId: entity.routeId || undefined,
+              routeType: entity.routeType || undefined,
+              directionId: entity.directionId || undefined,
+              stopId: entity.stopId || undefined,
+              tripId: entity.trip?.tripId || undefined,
+            };
+            informedEntities.push(informedEntity);
+            
+            if (entity.routeId) {
+              affectedRoutes.push(entity.routeId);
+            }
+          }
+        }
+        
+        // Determine severity (simplified logic)
+        let severity: 'info' | 'warning' | 'severe' = 'info';
+        if (headerText.toLowerCase().includes('suspended') || 
+            headerText.toLowerCase().includes('no service') ||
+            descriptionText.toLowerCase().includes('suspended')) {
+          severity = 'severe';
+        } else if (headerText.toLowerCase().includes('delay') || 
+                   headerText.toLowerCase().includes('slower') ||
+                   descriptionText.toLowerCase().includes('delay')) {
+          severity = 'warning';
+        }
+        
+        // Extract timing information
+        let activePeriod: { start?: Date; end?: Date } | undefined;
+        if (alert.activePeriod && alert.activePeriod.length > 0) {
+          const period = alert.activePeriod[0];
+          activePeriod = {
+            start: period.start ? new Date((period.start as any).low * 1000) : undefined,
+            end: period.end ? new Date((period.end as any).low * 1000) : undefined,
+          };
+        }
+
+        alerts.push({
+          id: entity.id || `alert-${Date.now()}`,
+          headerText,
+          descriptionText,
+          affectedRoutes,
+          severity,
+          informedEntities,
+          activePeriod
+        });
       }
       
+      console.log(`[RealMTAService] Parsed ${alerts.length} service alerts`);
       return alerts;
+      
     } catch (error) {
-      console.error('[RealMTAService] Error fetching service alerts:', error);
+      console.error('[RealMTAService] Error parsing alerts protobuf:', error);
       return [];
     }
   }
@@ -1298,6 +1430,181 @@ export class RealMTAService {
     return allAlerts.filter(alert => 
       alert.affectedRoutes.some(route => lines.includes(route))
     );
+  }
+
+  /**
+   * Get service alerts filtered for specific direction (0=outbound, 1=inbound)
+   */
+  async getServiceAlertsForDirection(lines: string[], direction: 0 | 1): Promise<ServiceAlert[]> {
+    const allAlerts = await this.getServiceAlerts();
+    
+    return allAlerts.filter(alert => {
+      // Check if alert affects any of the specified lines
+      const affectsLines = alert.affectedRoutes.some(route => lines.includes(route));
+      if (!affectsLines) return false;
+      
+      // Check if alert specifies direction and if it matches
+      const hasDirectionFilter = alert.informedEntities.some(entity => 
+        entity.directionId === direction && entity.routeId && lines.includes(entity.routeId)
+      );
+      
+      // If no direction specified in alert, include it (affects all directions)
+      const hasNoDirectionFilter = alert.informedEntities.some(entity => 
+        entity.directionId === undefined && entity.routeId && lines.includes(entity.routeId)
+      );
+      
+      return hasDirectionFilter || hasNoDirectionFilter;
+    });
+  }
+
+  /**
+   * Get service alerts filtered for specific stations
+   */
+  async getServiceAlertsForStations(stationIds: string[]): Promise<ServiceAlert[]> {
+    const allAlerts = await this.getServiceAlerts();
+    
+    return allAlerts.filter(alert => 
+      alert.informedEntities.some(entity => 
+        entity.stopId && stationIds.some(stationId => 
+          entity.stopId === stationId || 
+          entity.stopId === `${stationId}N` || 
+          entity.stopId === `${stationId}S`
+        )
+      )
+    );
+  }
+
+  /**
+   * Get service alerts for specific commute route
+   * Filters by lines, direction, and stations on the route
+   */
+  async getServiceAlertsForCommute(
+    lines: string[], 
+    direction: 0 | 1, 
+    stationIds: string[]
+  ): Promise<ServiceAlert[]> {
+    const allAlerts = await this.getServiceAlerts();
+    
+    return allAlerts.filter(alert => {
+      // Must affect at least one of our lines
+      const affectsLines = alert.affectedRoutes.some(route => lines.includes(route));
+      if (!affectsLines) return false;
+      
+      // Check if alert is specific to our direction or affects all directions
+      const directionMatch = alert.informedEntities.some(entity => {
+        if (!entity.routeId || !lines.includes(entity.routeId)) return false;
+        return entity.directionId === undefined || entity.directionId === direction;
+      });
+      
+      // Check if alert affects any of our stations
+      const stationMatch = alert.informedEntities.some(entity => 
+        entity.stopId && stationIds.some(stationId => 
+          entity.stopId === stationId || 
+          entity.stopId === `${stationId}N` || 
+          entity.stopId === `${stationId}S`
+        )
+      );
+      
+      // Include alert if it matches direction and either has no station filter or affects our stations
+      const hasNoStationFilter = alert.informedEntities.every(entity => !entity.stopId);
+      return directionMatch && (stationMatch || hasNoStationFilter);
+    });
+  }
+
+  /**
+   * Check if a route is affected by service alerts and return alert information
+   */
+  async checkRouteForAlerts(route: Route, direction: 0 | 1): Promise<{
+    hasAlerts: boolean;
+    severity: 'info' | 'warning' | 'severe' | undefined;
+    alerts: ServiceAlert[];
+  }> {
+    // Determine which lines this route uses
+    const routeLines: string[] = [];
+    const routeStations: string[] = [];
+    
+    // Extract lines and stations from route steps
+    for (const step of route.steps) {
+      if (step.line) {
+        routeLines.push(step.line);
+      }
+      if (step.fromStation) {
+        // Convert station names to station IDs
+        const stationId = this.getStationIdFromName(step.fromStation);
+        if (stationId) routeStations.push(stationId);
+      }
+      if (step.toStation) {
+        const stationId = this.getStationIdFromName(step.toStation);
+        if (stationId) routeStations.push(stationId);
+      }
+    }
+    
+    // Add default stations for F train routes
+    if (routeLines.includes('F')) {
+      routeStations.push('F20', 'F18'); // Carroll St, 23rd St
+    }
+    
+    // Get alerts for this specific commute
+    const alerts = await this.getServiceAlertsForCommute(
+      routeLines.length > 0 ? routeLines : ['F'], // Default to F line
+      direction,
+      routeStations
+    );
+    
+    // Determine highest severity
+    let highestSeverity: 'info' | 'warning' | 'severe' | undefined;
+    if (alerts.length > 0) {
+      const severities = alerts.map(alert => alert.severity);
+      if (severities.includes('severe')) {
+        highestSeverity = 'severe';
+      } else if (severities.includes('warning')) {
+        highestSeverity = 'warning';
+      } else {
+        highestSeverity = 'info';
+      }
+    }
+    
+    return {
+      hasAlerts: alerts.length > 0,
+      severity: highestSeverity,
+      alerts
+    };
+  }
+
+  /**
+   * Convert station name to station ID
+   */
+  private getStationIdFromName(stationName: string): string | null {
+    const stationMappings: { [key: string]: string } = {
+      'Carroll St': 'F20',
+      '23rd St': 'F18',
+      'Jay St-MetroTech': 'JAY_ST_METROTECH',
+      '23rd St-8th Ave': 'A23',
+      '14th St-8th Ave': 'A27'
+    };
+    
+    return stationMappings[stationName] || null;
+  }
+
+  /**
+   * Enrich routes with service alert information
+   */
+  async enrichRoutesWithAlerts(routes: Route[], direction: 0 | 1): Promise<Route[]> {
+    const enrichedRoutes: Route[] = [];
+    
+    for (const route of routes) {
+      const alertInfo = await this.checkRouteForAlerts(route, direction);
+      
+      const enrichedRoute: Route = {
+        ...route,
+        hasServiceAlerts: alertInfo.hasAlerts,
+        alertSeverity: alertInfo.severity
+      };
+      
+      enrichedRoutes.push(enrichedRoute);
+    }
+    
+    return enrichedRoutes;
   }
 
   /**

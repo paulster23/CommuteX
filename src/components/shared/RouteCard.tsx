@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Animated, useColorScheme } from 'react-native';
-import { ArrowDown, ArrowUp } from 'lucide-react-native';
+import { ArrowDown, ArrowUp, AlertTriangle } from 'lucide-react-native';
 import { Route, DataSourceType } from '../../services/RealMTAService';
 import { TransferRouteIcon } from '../TransferRouteIcon';
 import { getThemeStyles } from '../../design/components';
@@ -105,7 +105,7 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
         borderTopWidth: 1,
         borderTopColor: styles.theme.colors.borderLight
       }}>
-        {/* Route description with LIVE indicator */}
+        {/* Route description with indicators */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
           <Text style={{ 
             fontSize: 12, 
@@ -118,18 +118,50 @@ export function RouteCard({ route, isExpanded, onToggle, isBestRoute }: RouteCar
               : 'Your Commute'}
           </Text>
           
-          {/* LIVE/ESTIMATED indicator */}
-          {route.isRealTimeData ? (
-            <View style={[styles.indicator.container, styles.indicator.live, { paddingHorizontal: 6, paddingVertical: 2 }]}>
-              <View style={[styles.indicator.dot, styles.indicator.liveDot, { width: 4, height: 4, borderRadius: 2, marginRight: 3 }]} />
-              <Text style={[styles.indicator.text, styles.indicator.liveText, { fontSize: 8 }]}>LIVE</Text>
-            </View>
-          ) : (
-            <View style={[styles.indicator.container, styles.indicator.estimated, { paddingHorizontal: 6, paddingVertical: 2 }]}>
-              <View style={[styles.indicator.dot, styles.indicator.estimatedDot, { width: 4, height: 4, borderRadius: 2, marginRight: 3 }]} />
-              <Text style={[styles.indicator.text, styles.indicator.estimatedText, { fontSize: 8 }]}>ESTIMATED</Text>
-            </View>
-          )}
+          {/* Indicators container */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {/* Service Alert indicator */}
+            {route.hasServiceAlerts && (
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: route.alertSeverity === 'severe' ? '#FF3B30' : 
+                               route.alertSeverity === 'warning' ? '#FF9500' : 
+                               '#007AFF',
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 10,
+                marginRight: 4
+              }}>
+                <AlertTriangle 
+                  size={8} 
+                  color="#FFFFFF" 
+                  style={{ marginRight: 3 }}
+                />
+                <Text style={{
+                  fontSize: 8,
+                  color: '#FFFFFF',
+                  fontWeight: '600',
+                  textTransform: 'uppercase'
+                }}>
+                  ALERT
+                </Text>
+              </View>
+            )}
+
+            {/* LIVE/ESTIMATED indicator */}
+            {route.isRealTimeData ? (
+              <View style={[styles.indicator.container, styles.indicator.live, { paddingHorizontal: 6, paddingVertical: 2 }]}>
+                <View style={[styles.indicator.dot, styles.indicator.liveDot, { width: 4, height: 4, borderRadius: 2, marginRight: 3 }]} />
+                <Text style={[styles.indicator.text, styles.indicator.liveText, { fontSize: 8 }]}>LIVE</Text>
+              </View>
+            ) : (
+              <View style={[styles.indicator.container, styles.indicator.estimated, { paddingHorizontal: 6, paddingVertical: 2 }]}>
+                <View style={[styles.indicator.dot, styles.indicator.estimatedDot, { width: 4, height: 4, borderRadius: 2, marginRight: 3 }]} />
+                <Text style={[styles.indicator.text, styles.indicator.estimatedText, { fontSize: 8 }]}>ESTIMATED</Text>
+              </View>
+            )}
+          </View>
         </View>
         
         {/* Walking distance with confidence */}
