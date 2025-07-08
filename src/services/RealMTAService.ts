@@ -729,6 +729,8 @@ export class RealMTAService {
       firstSegment.startStopId
     );
     
+    console.log(`[Transfer] First segment (${firstSegment.line}): ${firstSegmentArrivals.length} arrivals`);
+    
     // Fetch second segment train arrivals
     const secondSegment = config.segments[1];
     const secondSegmentArrivals = await this.fetchTrainArrivalsFromFeed(
@@ -738,6 +740,19 @@ export class RealMTAService {
       secondSegment.line,
       secondSegment.startStopId
     );
+    
+    console.log(`[Transfer] Second segment (${secondSegment.line}): ${secondSegmentArrivals.length} arrivals`);
+    
+    // Validate arrivals data
+    if (firstSegmentArrivals.length === 0) {
+      console.warn(`[Transfer] No ${firstSegment.line} arrivals - transfer routes unavailable`);
+      return [];
+    }
+    
+    if (secondSegmentArrivals.length === 0) {
+      console.warn(`[Transfer] No ${secondSegment.line} arrivals - transfer routes unavailable`);
+      return [];
+    }
     
     // Calculate routes for each first segment train
     for (let i = 0; i < firstSegmentArrivals.length; i++) {
@@ -762,12 +777,15 @@ export class RealMTAService {
       const earliestDepartureTime = new Date(arrivalAtTransferStation.getTime() + transferStation.transferTime * 60000);
       
       // Find the next train on second segment
+      console.log(`[Transfer] Connection attempt: First train arrives at ${this.formatTime(arrivalAtTransferStation)}, need second train after ${this.formatTime(earliestDepartureTime)}`);
+      
       const availableSecondTrains = secondSegmentArrivals.filter(train => {
         const trainDepartureTime = new Date(train.departureTime! * 1000);
         return trainDepartureTime.getTime() >= earliestDepartureTime.getTime();
       });
       
       if (availableSecondTrains.length === 0) {
+        console.log(`[Transfer] No connecting trains available for first train ${i + 1}`);
         continue; // No connecting trains available
       }
       
@@ -866,7 +884,11 @@ export class RealMTAService {
       routes.push(route);
     }
     
-    console.log(`[RealMTAService] Generated ${routes.length} transfer routes`);
+    if (routes.length === 0) {
+      console.log('[Transfer] No connecting trains available - no transfer routes generated');
+    } else {
+      console.log(`[Transfer] Generated ${routes.length} transfer routes`);
+    }
     return routes;
   }
 
