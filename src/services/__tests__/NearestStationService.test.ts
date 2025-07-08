@@ -173,5 +173,19 @@ describe('NearestStationService', () => {
       distance: result?.distance,
       stationIds: result?.stationIds
     });
+    
+    // Verify that F train gets F20 station ID (should match RealMTAService)
+    expect(result?.stationIds['F']).toBe('F20');
+  });
+
+  test('shouldGetConsistentStationIdsWithRealMTAService', () => {
+    // Red: Test that both services get the same station ID for F train at Carroll St
+    const { RealMTAService } = require('../RealMTAService');
+    const service = new RealMTAService();
+    
+    // Test the new dynamic method
+    const carrollStId = service.getCarrollStStopId();
+    
+    expect(carrollStId).toBe('F20');
   });
 });

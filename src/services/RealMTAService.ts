@@ -1,6 +1,8 @@
 import { StaticLocationProvider, LocationProvider } from './LocationService';
 import { StationMappingService } from './StationMappingService';
 import { CacheManager } from './CacheManager';
+import { StationDatabase } from './StationDatabase';
+import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 
 export type DataSourceType = 'realtime' | 'estimate' | 'fixed';
 
@@ -105,18 +107,31 @@ export class RealMTAService {
   private readonly ACE_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace';
   private readonly ALERTS_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-alerts';
   
-  // F train station IDs (from GTFS static data)
-  private readonly CARROLL_ST_STOP_ID = 'F20'; // Carroll St (F,G)
-  private readonly TWENTY_THIRD_ST_STOP_ID = 'F18'; // 23rd St (F,M)
-  private readonly JAY_ST_F_STOP_ID = 'F25'; // Jay St-MetroTech (F)
+  // Dynamic station ID getters using StationDatabase
+  public getCarrollStStopId(): string {
+    const station = StationDatabase.getStationById('F20');
+    return station ? StationDatabase.getGtfsIdForLine(station, 'F') : 'F20';
+  }
   
-  // C train station IDs (from GTFS static data)
-  private readonly JAY_ST_C_STOP_ID = 'A41'; // Jay St-MetroTech (A,C)
-  private readonly TWENTY_THIRD_ST_C_STOP_ID = 'A23'; // 23rd St-8th Ave (C,E) - Manhattan
+  private getTwentyThirdStStopId(): string {
+    const station = StationDatabase.getStationById('F18');
+    return station ? StationDatabase.getGtfsIdForLine(station, 'F') : 'F18';
+  }
   
-  // A train station IDs (from GTFS static data)
-  private readonly JAY_ST_A_STOP_ID = 'A41'; // Jay St-MetroTech (A,C) - same as C train
-  private readonly FOURTEENTH_ST_A_STOP_ID = 'A27'; // 14th St-8th Ave (A,C,E) - Manhattan
+  private getJayStStopIdForLine(line: 'F' | 'A' | 'C'): string {
+    const station = StationDatabase.getStationById('JAY_ST_METROTECH');
+    return station ? StationDatabase.getGtfsIdForLine(station, line) : (line === 'F' ? 'F25' : 'A41');
+  }
+  
+  private getTwentyThirdStCStopId(): string {
+    const station = StationDatabase.getStationById('A23');
+    return station ? StationDatabase.getGtfsIdForLine(station, 'C') : 'A23';
+  }
+  
+  private getFourteenthStAStopId(): string {
+    const station = StationDatabase.getStationById('A27');
+    return station ? StationDatabase.getGtfsIdForLine(station, 'A') : 'A27';
+  }
   
   constructor(locationProvider?: LocationProvider) {
     this.locationProvider = locationProvider || new StaticLocationProvider();
@@ -265,24 +280,8 @@ export class RealMTAService {
       
       const gtfsBuffer = await response.arrayBuffer();
       
-      // Parse GTFS-RT protobuf data (simplified - would need proper protobuf parser)
-      // For now, return mock real-time data that simulates GTFS structure
-      const now = new Date();
-      const arrivals: StopTimeUpdate[] = [];
-      
-      // Generate next 6 train arrivals (every 6-8 minutes during peak)
-      for (let i = 0; i < 6; i++) {
-        const departureTime = new Date(now.getTime() + (i * 7 + 2) * 60000); // 2, 9, 16, 23 minutes from now
-        arrivals.push({
-          stopId: stopId,
-          stopSequence: 1,
-          departureTime: Math.floor(departureTime.getTime() / 1000),
-          arrivalTime: Math.floor(departureTime.getTime() / 1000)
-        });
-      }
-      
-      console.log(`[RealMTAService] Found ${arrivals.length} upcoming ${line} trains at ${station}`);
-      return arrivals;
+      // Parse real GTFS-RT protobuf data using the same logic as StationDepartureService
+      return this.parseGtfsBuffer(gtfsBuffer, line, stopId, direction, station);
       
     } catch (error) {
       console.error(`[RealMTAService] ${line} train GTFS-RT fetch failed:`, error);
@@ -291,11 +290,83 @@ export class RealMTAService {
   }
 
   /**
+   * Parse GTFS-RT protobuf buffer and extract relevant stop time updates
+   * (Copied from StationDepartureService to ensure consistency)
+   */
+  private parseGtfsBuffer(gtfsBuffer: ArrayBuffer, line: string, stopId: string, direction: 'northbound' | 'southbound', station: string): StopTimeUpdate[] {
+    console.log(`[RealMTAService] Parsing GTFS-RT protobuf data for ${line} line`);
+    console.log(`[RealMTAService] Looking for stop ID: ${stopId}`);
+    console.log(`[RealMTAService] Buffer size: ${gtfsBuffer.byteLength} bytes`);
+    
+    if (gtfsBuffer.byteLength === 0) {
+      console.log(`[RealMTAService] Empty GTFS buffer received for ${line} line`);
+      return [];
+    }
+    
+    // Parse real GTFS-RT protobuf data
+    const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(
+      new Uint8Array(gtfsBuffer)
+    );
+    
+    console.log(`[RealMTAService] Feed contains ${feed.entity.length} entities`);
+    
+    const arrivals: StopTimeUpdate[] = [];
+    const now = Date.now() / 1000; // Current time in seconds
+    const directionalStopId = direction === 'northbound' ? `${stopId}N` : `${stopId}S`;
+    
+    // Process each entity in the feed
+    for (const entity of feed.entity) {
+      if (!entity.tripUpdate || !entity.tripUpdate.stopTimeUpdate) {
+        continue;
+      }
+      
+      // Find stop time updates for our station
+      for (const stopTimeUpdate of entity.tripUpdate.stopTimeUpdate) {
+        if (stopTimeUpdate.stopId && stopTimeUpdate.stopId === directionalStopId) {
+          console.log(`[RealMTAService] MATCH FOUND! Looking for: ${directionalStopId}, Found: ${stopTimeUpdate.stopId}`);
+          
+          // Handle both .low format (64-bit) and direct value format
+          const rawDepartureTime = stopTimeUpdate.departure?.time?.low || 
+                                  stopTimeUpdate.departure?.time || 
+                                  stopTimeUpdate.arrival?.time?.low || 
+                                  stopTimeUpdate.arrival?.time;
+          const rawArrivalTime = stopTimeUpdate.arrival?.time?.low || stopTimeUpdate.arrival?.time;
+          
+          // Convert to number if it's a string
+          const departureTime = rawDepartureTime ? Number(rawDepartureTime) : undefined;
+          const arrivalTime = rawArrivalTime ? Number(rawArrivalTime) : undefined;
+          
+          console.log(`[RealMTAService] Time data - departure: ${departureTime}, arrival: ${arrivalTime}, now: ${now}`);
+          
+          if (departureTime && departureTime > now) {
+            console.log(`[RealMTAService] Adding train - departure in ${Math.round((departureTime - now) / 60)} minutes`);
+            arrivals.push({
+              stopId: stopTimeUpdate.stopId,
+              stopSequence: stopTimeUpdate.stopSequence || 1,
+              departureTime: departureTime,
+              arrivalTime: arrivalTime || departureTime
+            });
+          } else {
+            console.log(`[RealMTAService] Skipping train - departureTime: ${departureTime}, now: ${now}, valid: ${departureTime && departureTime > now}`);
+          }
+        }
+      }
+    }
+    
+    // Sort by departure time and limit to 6
+    arrivals.sort((a, b) => a.departureTime! - b.departureTime!);
+    arrivals.splice(6); // Keep only first 6
+    
+    console.log(`[RealMTAService] Found ${arrivals.length} upcoming ${line} trains at ${station}`);
+    return arrivals;
+  }
+
+  /**
    * Fetch real-time train arrivals for F train (backward compatibility)
    */
   private async fetchTrainArrivals(direction: 'northbound' | 'southbound', station: string): Promise<StopTimeUpdate[]> {
     // Use appropriate stop ID based on station
-    const stopId = station === 'Carroll St' ? this.CARROLL_ST_STOP_ID : this.TWENTY_THIRD_ST_STOP_ID;
+    const stopId = station === 'Carroll St' ? this.getCarrollStStopId() : this.getTwentyThirdStStopId();
     return this.fetchTrainArrivalsFromFeed(this.F_TRAIN_FEED_URL, direction, station, 'F', stopId);
   }
 
@@ -518,8 +589,8 @@ export class RealMTAService {
             fromStation: 'Carroll St',
             toStation: 'Jay St-MetroTech',
             feedUrl: this.F_TRAIN_FEED_URL,
-            startStopId: this.CARROLL_ST_STOP_ID,
-            endStopId: this.JAY_ST_F_STOP_ID
+            startStopId: this.getCarrollStStopId(),
+            endStopId: this.getJayStStopIdForLine('F')
           },
           {
             line: 'C',
@@ -527,8 +598,8 @@ export class RealMTAService {
             fromStation: 'Jay St-MetroTech',
             toStation: '23rd St-8th Ave',
             feedUrl: this.ACE_TRAIN_FEED_URL,
-            startStopId: this.JAY_ST_C_STOP_ID,
-            endStopId: this.TWENTY_THIRD_ST_C_STOP_ID
+            startStopId: this.getJayStStopIdForLine('C'),
+            endStopId: this.getTwentyThirdStCStopId()
           }
         ],
         transferStations: [
@@ -537,8 +608,8 @@ export class RealMTAService {
             transferTime: 0, // Instant transfer
             fromLine: 'F',
             toLine: 'C',
-            fromStopId: this.JAY_ST_F_STOP_ID,
-            toStopId: this.JAY_ST_C_STOP_ID
+            fromStopId: this.getJayStStopIdForLine('F'),
+            toStopId: this.getJayStStopIdForLine('C')
           }
         ],
         getWalkingToStation: () => Promise.resolve(walkingToStation),
@@ -576,8 +647,8 @@ export class RealMTAService {
             fromStation: '23rd St-8th Ave',
             toStation: 'Jay St-MetroTech',
             feedUrl: this.ACE_TRAIN_FEED_URL,
-            startStopId: this.TWENTY_THIRD_ST_C_STOP_ID,
-            endStopId: this.JAY_ST_C_STOP_ID
+            startStopId: this.getTwentyThirdStCStopId(),
+            endStopId: this.getJayStStopIdForLine('C')
           },
           {
             line: 'F',
@@ -585,8 +656,8 @@ export class RealMTAService {
             fromStation: 'Jay St-MetroTech',
             toStation: 'Carroll St',
             feedUrl: this.F_TRAIN_FEED_URL,
-            startStopId: this.JAY_ST_F_STOP_ID,
-            endStopId: this.CARROLL_ST_STOP_ID
+            startStopId: this.getJayStStopIdForLine('F'),
+            endStopId: this.getCarrollStStopId()
           }
         ],
         transferStations: [
@@ -595,8 +666,8 @@ export class RealMTAService {
             transferTime: 0, // Instant transfer
             fromLine: 'C',
             toLine: 'F',
-            fromStopId: this.JAY_ST_C_STOP_ID,
-            toStopId: this.JAY_ST_F_STOP_ID
+            fromStopId: this.getJayStStopIdForLine('C'),
+            toStopId: this.getJayStStopIdForLine('F')
           }
         ],
         getWalkingToStation: () => Promise.resolve(walkingToStation),
@@ -799,8 +870,8 @@ export class RealMTAService {
             fromStation: 'Carroll St',
             toStation: 'Jay St-MetroTech',
             feedUrl: this.F_TRAIN_FEED_URL,
-            startStopId: this.CARROLL_ST_STOP_ID,
-            endStopId: this.JAY_ST_F_STOP_ID
+            startStopId: this.getCarrollStStopId(),
+            endStopId: this.getJayStStopIdForLine('F')
           },
           {
             line: 'A',
@@ -808,8 +879,8 @@ export class RealMTAService {
             fromStation: 'Jay St-MetroTech',
             toStation: '14th St-8th Ave',
             feedUrl: this.ACE_TRAIN_FEED_URL,
-            startStopId: this.JAY_ST_A_STOP_ID,
-            endStopId: this.FOURTEENTH_ST_A_STOP_ID
+            startStopId: this.getJayStStopIdForLine('A'),
+            endStopId: this.getFourteenthStAStopId()
           },
           {
             line: 'C',
@@ -817,8 +888,8 @@ export class RealMTAService {
             fromStation: '14th St-8th Ave',
             toStation: '23rd St-8th Ave',
             feedUrl: this.ACE_TRAIN_FEED_URL,
-            startStopId: this.FOURTEENTH_ST_A_STOP_ID,
-            endStopId: this.TWENTY_THIRD_ST_C_STOP_ID
+            startStopId: this.getFourteenthStAStopId(),
+            endStopId: this.getTwentyThirdStCStopId()
           }
         ],
         transferStations: [
@@ -827,16 +898,16 @@ export class RealMTAService {
             transferTime: 0, // Instant transfer F to A
             fromLine: 'F',
             toLine: 'A',
-            fromStopId: this.JAY_ST_F_STOP_ID,
-            toStopId: this.JAY_ST_A_STOP_ID
+            fromStopId: this.getJayStStopIdForLine('F'),
+            toStopId: this.getJayStStopIdForLine('A')
           },
           {
             name: '14th St-8th Ave',
             transferTime: 0, // Instant transfer A to C/E
             fromLine: 'A',
             toLine: 'C',
-            fromStopId: this.FOURTEENTH_ST_A_STOP_ID,
-            toStopId: this.FOURTEENTH_ST_A_STOP_ID // Same platform for A,C,E
+            fromStopId: this.getFourteenthStAStopId(),
+            toStopId: this.getFourteenthStAStopId() // Same platform for A,C,E
           }
         ],
         getWalkingToStation: () => Promise.resolve(walkingToStation),
@@ -874,8 +945,8 @@ export class RealMTAService {
             fromStation: '23rd St-8th Ave',
             toStation: '14th St-8th Ave',
             feedUrl: this.ACE_TRAIN_FEED_URL,
-            startStopId: this.TWENTY_THIRD_ST_C_STOP_ID,
-            endStopId: this.FOURTEENTH_ST_A_STOP_ID
+            startStopId: this.getTwentyThirdStCStopId(),
+            endStopId: this.getFourteenthStAStopId()
           },
           {
             line: 'A',
@@ -883,8 +954,8 @@ export class RealMTAService {
             fromStation: '14th St-8th Ave',
             toStation: 'Jay St-MetroTech',
             feedUrl: this.ACE_TRAIN_FEED_URL,
-            startStopId: this.FOURTEENTH_ST_A_STOP_ID,
-            endStopId: this.JAY_ST_A_STOP_ID
+            startStopId: this.getFourteenthStAStopId(),
+            endStopId: this.getJayStStopIdForLine('A')
           },
           {
             line: 'F',
@@ -892,8 +963,8 @@ export class RealMTAService {
             fromStation: 'Jay St-MetroTech',
             toStation: 'Carroll St',
             feedUrl: this.F_TRAIN_FEED_URL,
-            startStopId: this.JAY_ST_F_STOP_ID,
-            endStopId: this.CARROLL_ST_STOP_ID
+            startStopId: this.getJayStStopIdForLine('F'),
+            endStopId: this.getCarrollStStopId()
           }
         ],
         transferStations: [
@@ -902,16 +973,16 @@ export class RealMTAService {
             transferTime: 0, // Instant transfer C/E to A
             fromLine: 'C',
             toLine: 'A',
-            fromStopId: this.FOURTEENTH_ST_A_STOP_ID,
-            toStopId: this.FOURTEENTH_ST_A_STOP_ID // Same platform for A,C,E
+            fromStopId: this.getFourteenthStAStopId(),
+            toStopId: this.getFourteenthStAStopId() // Same platform for A,C,E
           },
           {
             name: 'Jay St-MetroTech',
             transferTime: 0, // Instant transfer A to F
             fromLine: 'A',
             toLine: 'F',
-            fromStopId: this.JAY_ST_A_STOP_ID,
-            toStopId: this.JAY_ST_F_STOP_ID
+            fromStopId: this.getJayStStopIdForLine('A'),
+            toStopId: this.getJayStStopIdForLine('F')
           }
         ],
         getWalkingToStation: () => Promise.resolve(walkingToStation),
