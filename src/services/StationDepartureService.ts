@@ -1,4 +1,5 @@
-import { SubwayStation } from './StationDatabase';
+import { SubwayStation, StationDatabase } from './StationDatabase';
+import { ConsolidatedStationResult } from './NearestStationService';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 
 export interface TrainDeparture {
@@ -37,11 +38,50 @@ export class StationDepartureService {
     for (const line of station.lines) {
       try {
         const feedUrl = this.getFeedUrlForLine(line);
-        const gtfsStopId = this.getDirectionalStopId(station.id, direction);
+        const gtfsStopId = this.getDirectionalStopId(StationDatabase.getGtfsIdForLine(station, line), direction);
         const stopTimeUpdates = await this.fetchTrainArrivalsFromFeed(
           feedUrl, 
           direction, 
           station.name, 
+          line, 
+          gtfsStopId
+        );
+
+        // Convert to TrainDeparture objects and limit to 5
+        const departures = stopTimeUpdates
+          .slice(0, 5) // Limit to next 5 trains per line
+          .map(update => ({
+            line,
+            departureTime: new Date(update.departureTime! * 1000),
+            relativeTime: this.formatRelativeTime(new Date(update.departureTime! * 1000))
+          }));
+
+        departuresByLine[line] = departures;
+      } catch (error) {
+        console.error(`Failed to fetch departures for ${line} line:`, error);
+        // Throw error instead of falling back to mock data
+        throw error;
+      }
+    }
+
+    return departuresByLine;
+  }
+
+  static async getDeparturesForConsolidatedStation(
+    consolidatedStation: ConsolidatedStationResult, 
+    direction: 'northbound' | 'southbound'
+  ): Promise<DeparturesByLine> {
+    const departuresByLine: DeparturesByLine = {};
+
+    // Fetch departures for each line at this consolidated station
+    for (const line of consolidatedStation.lines) {
+      try {
+        const feedUrl = this.getFeedUrlForLine(line);
+        const gtfsStopId = this.getDirectionalStopId(consolidatedStation.stationIds[line], direction);
+        const stopTimeUpdates = await this.fetchTrainArrivalsFromFeed(
+          feedUrl, 
+          direction, 
+          consolidatedStation.name, 
           line, 
           gtfsStopId
         );

@@ -4,6 +4,7 @@ export interface SubwayStation {
   lines: string[];
   lat: number;
   lng: number;
+  gtfsIds?: { [line: string]: string }; // Maps train lines to their GTFS station IDs
 }
 
 // NYC Subway Station Database
@@ -25,18 +26,17 @@ const SUBWAY_STATIONS: SubwayStation[] = [
     lng: -73.992821
   },
   {
-    id: 'F25',
+    id: 'JAY_ST_METROTECH',
     name: 'Jay St-MetroTech',
-    lines: ['F'],
+    lines: ['A', 'C', 'F', 'R'],
     lat: 40.692338,
-    lng: -73.987342
-  },
-  {
-    id: 'A41',
-    name: 'Jay St-MetroTech',
-    lines: ['A', 'C'],
-    lat: 40.692338,
-    lng: -73.987342
+    lng: -73.987342,
+    gtfsIds: {
+      'A': 'A41',
+      'C': 'A41',
+      'F': 'F25',
+      'R': 'R29'
+    }
   },
   {
     id: 'A23',
@@ -170,6 +170,15 @@ export class StationDatabase {
     return [...SUBWAY_STATIONS];
   }
 
+  static getGtfsIdForLine(station: SubwayStation, line: string): string {
+    // If station has specific GTFS IDs mapping, use it
+    if (station.gtfsIds && station.gtfsIds[line]) {
+      return station.gtfsIds[line];
+    }
+    // Otherwise, use the default station ID
+    return station.id;
+  }
+
   static getNearestStation(lat: number, lng: number): { station: SubwayStation; distance: number } | null {
     if (SUBWAY_STATIONS.length === 0) return null;
 
@@ -185,6 +194,22 @@ export class StationDatabase {
     }
 
     return { station: nearest, distance: shortestDistance };
+  }
+
+  static getNearestStations(lat: number, lng: number, radiusMiles: number = 0.15): Array<{ station: SubwayStation; distance: number }> {
+    if (SUBWAY_STATIONS.length === 0) return [];
+
+    const stationsWithDistances: Array<{ station: SubwayStation; distance: number }> = [];
+
+    for (const station of SUBWAY_STATIONS) {
+      const distance = this.calculateDistance(lat, lng, station.lat, station.lng);
+      if (distance <= radiusMiles) {
+        stationsWithDistances.push({ station, distance });
+      }
+    }
+
+    // Sort by distance
+    return stationsWithDistances.sort((a, b) => a.distance - b.distance);
   }
 
   // Haversine formula for calculating distance between two coordinates (reused from LocationService)

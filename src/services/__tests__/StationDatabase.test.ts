@@ -24,18 +24,17 @@ describe('StationDatabase', () => {
   });
 
   test('shouldReturnJayStMetroTechStationCoordinates', () => {
-    // Red: Test that Jay St-MetroTech station has correct coordinates for both F and A/C platforms
-    const fStation = StationDatabase.getStationById('F25');
-    const acStation = StationDatabase.getStationById('A41');
+    // Red: Test that Jay St-MetroTech station has correct coordinates with all train lines consolidated
+    const station = StationDatabase.getStationById('JAY_ST_METROTECH');
     
-    expect(fStation).toBeDefined();
-    expect(fStation?.name).toBe('Jay St-MetroTech');
-    expect(fStation?.lines).toContain('F');
-    
-    expect(acStation).toBeDefined();
-    expect(acStation?.name).toBe('Jay St-MetroTech');
-    expect(acStation?.lines).toContain('A');
-    expect(acStation?.lines).toContain('C');
+    expect(station).toBeDefined();
+    expect(station?.name).toBe('Jay St-MetroTech');
+    expect(station?.lines).toContain('F');
+    expect(station?.lines).toContain('A');
+    expect(station?.lines).toContain('C');
+    expect(station?.lines).toContain('R');
+    expect(station?.lat).toBeCloseTo(40.692338, 5);
+    expect(station?.lng).toBeCloseTo(-73.987342, 5);
   });
 
   test('shouldReturnAllStationsForLine', () => {
@@ -74,5 +73,29 @@ describe('StationDatabase', () => {
     const stations = StationDatabase.getStationsForLine('INVALID');
     
     expect(stations).toEqual([]);
+  });
+
+  test('shouldReturnCorrectGtfsIdForLine', () => {
+    // Red: Test GTFS ID mapping for different train lines at Jay St-MetroTech
+    const station = StationDatabase.getStationById('JAY_ST_METROTECH');
+    
+    expect(station).toBeDefined();
+    
+    // Test GTFS ID mapping for different lines
+    expect(StationDatabase.getGtfsIdForLine(station!, 'F')).toBe('F25');
+    expect(StationDatabase.getGtfsIdForLine(station!, 'A')).toBe('A41');
+    expect(StationDatabase.getGtfsIdForLine(station!, 'C')).toBe('A41');
+    expect(StationDatabase.getGtfsIdForLine(station!, 'R')).toBe('R29');
+  });
+
+  test('shouldReturnDefaultStationIdWhenNoGtfsMapping', () => {
+    // Red: Test fallback to default station ID when no GTFS mapping exists
+    const carrollStation = StationDatabase.getStationById('F20');
+    
+    expect(carrollStation).toBeDefined();
+    
+    // Should return default station ID when no GTFS mapping exists
+    expect(StationDatabase.getGtfsIdForLine(carrollStation!, 'F')).toBe('F20');
+    expect(StationDatabase.getGtfsIdForLine(carrollStation!, 'G')).toBe('F20');
   });
 });

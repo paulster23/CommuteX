@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Platform, RefreshControl, ScrollView, Alert, To
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MapPin, Navigation, Clock, AlertCircle, Train, Zap } from 'lucide-react-native';
 import { GPSLocationProvider, Location } from '../services/LocationService';
-import { NearestStationService, NearestStationResult } from '../services/NearestStationService';
+import { NearestStationService, NearestStationResult, ConsolidatedStationResult } from '../services/NearestStationService';
 import { StationDepartureService, DeparturesByLine } from '../services/StationDepartureService';
 import { getThemeStyles } from '../design/components';
 import { useColorScheme } from 'react-native';
@@ -12,7 +12,7 @@ import { TrainTimePill } from '../components/TrainTimePill';
 
 interface LocationState {
   location: Location | null;
-  nearestStation: NearestStationResult | null;
+  nearestStation: ConsolidatedStationResult | null;
   loading: boolean;
   error: string | null;
 }
@@ -61,13 +61,13 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
 
   const gpsProvider = locationProvider || new GPSLocationProvider();
 
-  const fetchDepartures = useCallback(async (station: any, direction: 'northbound' | 'southbound', silent = false) => {
+  const fetchDepartures = useCallback(async (station: ConsolidatedStationResult, direction: 'northbound' | 'southbound', silent = false) => {
     if (!silent) {
       setDepartureState(prev => ({ ...prev, loading: true, error: null }));
     }
 
     try {
-      const departures = await StationDepartureService.getDeparturesForStation(station, direction);
+      const departures = await StationDepartureService.getDeparturesForConsolidatedStation(station, direction);
       setDepartureState({
         departures,
         loading: false,
@@ -90,7 +90,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
 
     try {
       const location = await gpsProvider.getCurrentLocation();
-      const nearestStation = NearestStationService.findNearestStation(location);
+      const nearestStation = NearestStationService.findNearestStationConsolidated(location);
 
       setLocationState({
         location,
@@ -103,7 +103,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
 
       // Fetch departures for the nearest station
       if (nearestStation) {
-        await fetchDepartures(nearestStation.station, direction);
+        await fetchDepartures(nearestStation, direction);
       }
     } catch (error) {
       let errorMessage = 'Unable to get your current location. Please try again.';
@@ -276,12 +276,12 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
       const isDirectionChange = hasInitiallyLoaded.current;
       if (isDirectionChange) {
         setDirectionChanging(true);
-        fetchDepartures(locationState.nearestStation.station, direction, true).finally(() => {
+        fetchDepartures(locationState.nearestStation, direction, true).finally(() => {
           setDirectionChanging(false);
         });
       } else {
         // Initial load - use normal mode
-        fetchDepartures(locationState.nearestStation.station, direction);
+        fetchDepartures(locationState.nearestStation, direction);
       }
     }
   }, [direction, locationState.nearestStation, locationState.loading, fetchDepartures]);
@@ -425,7 +425,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                   <Train size={20} color="#FFFFFF" />
                 </View>
                 <View style={styles.routeCard.textInfo}>
-                  <Text style={styles.routeCard.title}>{locationState.nearestStation.station.name}</Text>
+                  <Text style={styles.routeCard.title}>{locationState.nearestStation.name}</Text>
                   <Text style={styles.routeCard.subtitle}>
                     {formatDistance(locationState.nearestStation.distance)} • {direction === 'northbound' ? 'North' : 'South'} trains
                   </Text>

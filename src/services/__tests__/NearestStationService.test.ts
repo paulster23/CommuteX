@@ -94,4 +94,84 @@ describe('NearestStationService', () => {
     expect(manhattanResult).toBeDefined();
     expect(brooklynResult?.station.id).not.toBe(manhattanResult?.station.id);
   });
+
+  test('shouldFindConsolidatedStationWithAllTrainLines', () => {
+    // Red: Test that consolidated station includes all train lines at Jay St-MetroTech
+    const jayStreetLocation: Location = { lat: 40.692338, lng: -73.987342 };
+    
+    const result = NearestStationService.findNearestStationConsolidated(jayStreetLocation);
+    
+    expect(result).toBeDefined();
+    expect(result?.name).toBe('Jay St-MetroTech');
+    expect(result?.lines).toContain('A');
+    expect(result?.lines).toContain('C');
+    expect(result?.lines).toContain('F');
+    expect(result?.lines).toContain('R');
+    expect(result?.stationIds['A']).toBe('A41');
+    expect(result?.stationIds['C']).toBe('A41');
+    expect(result?.stationIds['F']).toBe('F25');
+    expect(result?.stationIds['R']).toBe('R29');
+  });
+
+  test('shouldReturnNearestStationWhenNoneWithinRadius', () => {
+    // Red: Test fallback behavior when no stations are within radius
+    const remoteLocation: Location = { lat: 50.0, lng: -80.0 }; // Very far from NYC
+    
+    const result = NearestStationService.findNearestStationConsolidated(remoteLocation);
+    
+    // Should still find a station (fallback to nearest station algorithm)
+    expect(result).toBeDefined();
+    expect(result?.distance).toBeGreaterThan(100); // Should be very far away
+    expect(result?.lines.length).toBeGreaterThan(0);
+  });
+
+  test('shouldConsolidateStationsWithinRadius', () => {
+    // Red: Test that consolidated method finds stations within radius
+    const carrollStLocation: Location = { lat: 40.679371, lng: -73.995458 }; // Exact Carroll St coordinates
+    
+    const result = NearestStationService.findNearestStationConsolidated(carrollStLocation);
+    
+    expect(result).toBeDefined();
+    expect(result?.lines.length).toBeGreaterThan(0);
+    expect(result?.distance).toBeGreaterThanOrEqual(0);
+    expect(result?.stationIds).toBeDefined();
+  });
+
+  test('shouldHaveCorrectStructureForConsolidatedResult', () => {
+    // Red: Test that consolidated result has all required properties
+    const carrollStLocation: Location = { lat: 40.679371, lng: -73.995458 }; // Exact Carroll St coordinates
+    
+    const result = NearestStationService.findNearestStationConsolidated(carrollStLocation);
+    
+    expect(result).toBeDefined();
+    expect(result?.name).toBeDefined();
+    expect(result?.lines).toBeDefined();
+    expect(Array.isArray(result?.lines)).toBe(true);
+    expect(result?.lat).toBeDefined();
+    expect(result?.lng).toBeDefined();
+    expect(result?.distance).toBeDefined();
+    expect(result?.stationIds).toBeDefined();
+    expect(typeof result?.stationIds).toBe('object');
+  });
+
+  test('shouldFindStationForUserLocation', () => {
+    // Red: Test for the user's specific location that was having issues
+    const userLocation: Location = { lat: 40.681177, lng: -74.003078 };
+    
+    const result = NearestStationService.findNearestStationConsolidated(userLocation);
+    
+    expect(result).toBeDefined();
+    expect(result?.name).toBeDefined();
+    expect(result?.lines.length).toBeGreaterThan(0);
+    expect(result?.stationIds).toBeDefined();
+    expect(result?.distance).toBeGreaterThan(0);
+    
+    // Log the result for debugging
+    console.log('User location result:', {
+      name: result?.name,
+      lines: result?.lines,
+      distance: result?.distance,
+      stationIds: result?.stationIds
+    });
+  });
 });
