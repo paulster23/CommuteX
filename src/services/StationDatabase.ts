@@ -16,7 +16,11 @@ const SUBWAY_STATIONS: SubwayStation[] = [
     name: 'Carroll St',
     lines: ['F', 'G'],
     lat: 40.679371,
-    lng: -73.995458
+    lng: -73.995458,
+    gtfsIds: {
+      'F': 'F20',
+      'G': 'G22'
+    }
   },
   {
     id: 'F18',
@@ -103,21 +107,34 @@ const SUBWAY_STATIONS: SubwayStation[] = [
     name: '4th Ave-9th St',
     lines: ['F', 'G'],
     lat: 40.670272,
-    lng: -73.988114
+    lng: -73.988114,
+    gtfsIds: {
+      'F': 'F22',
+      'G': 'G24'
+    }
   },
   {
     id: 'F24',
     name: 'Bergen St',
     lines: ['F', 'G'],
     lat: 40.686145,
-    lng: -73.990064
+    lng: -73.990064,
+    gtfsIds: {
+      'F': 'F24',
+      'G': 'G26'
+    }
   },
   {
     id: 'F26',
     name: 'Hoyt-Schermerhorn Sts',
     lines: ['A', 'C', 'G'],
     lat: 40.688484,
-    lng: -73.985001
+    lng: -73.985001,
+    gtfsIds: {
+      'A': 'A42',
+      'C': 'A42',
+      'G': 'G29'
+    }
   },
   {
     id: 'R25',

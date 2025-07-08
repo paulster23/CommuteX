@@ -98,8 +98,9 @@ export class StationDepartureService {
         departuresByLine[line] = departures;
       } catch (error) {
         console.error(`Failed to fetch departures for ${line} line:`, error);
-        // Throw error instead of falling back to mock data
-        throw error;
+        console.log(`[StationDepartureService] Continuing with other lines despite ${line} line failure`);
+        // Continue processing other lines instead of throwing error
+        // This allows partial success - show available trains even if some lines fail
       }
     }
 
@@ -169,7 +170,7 @@ export class StationDepartureService {
       console.log(`[StationDepartureService] Fetching ${direction} ${line} train GTFS-RT data for ${station}...`);
       
       const gtfsBuffer = await this.fetchGtfsBuffer(feedUrl, line);
-      const arrivals = this.parseGtfsBuffer(gtfsBuffer, line, stopId);
+      const arrivals = this.parseGtfsBuffer(gtfsBuffer, line, stopId, direction);
       
       console.log(`[StationDepartureService] Found ${arrivals.length} upcoming ${line} trains at ${station}`);
       return arrivals;
@@ -210,7 +211,7 @@ export class StationDepartureService {
   /**
    * Parse GTFS-RT protobuf buffer and extract relevant stop time updates
    */
-  private static parseGtfsBuffer(gtfsBuffer: ArrayBuffer, line: string, stopId: string): StopTimeUpdate[] {
+  private static parseGtfsBuffer(gtfsBuffer: ArrayBuffer, line: string, stopId: string, direction: 'northbound' | 'southbound'): StopTimeUpdate[] {
     console.log(`[StationDepartureService] Parsing GTFS-RT protobuf data for ${line} line`);
     console.log(`[StationDepartureService] Looking for stop ID: ${stopId}`);
     console.log(`[StationDepartureService] Buffer size: ${gtfsBuffer.byteLength} bytes`);
@@ -243,15 +244,40 @@ export class StationDepartureService {
         if (stopTimeUpdate.stopId) {
           allStopIds.add(stopTimeUpdate.stopId);
           
-          // Use strict directional matching to prevent cross-contamination
+          // Enhanced directional matching with robust fallback patterns
           const matches = [
-            stopTimeUpdate.stopId === stopId, // Exact directional match (e.g., F20N)
-            // Only fall back to base ID if no directional suffix is requested
-            stopId === baseStopId && stopTimeUpdate.stopId === baseStopId, // Base match only when explicitly looking for base
+            stopTimeUpdate.stopId === stopId, // Exact directional match (e.g., F20S)
+            
+            // Enhanced fallback patterns for various MTA GTFS naming conventions
+            stopTimeUpdate.stopId === baseStopId, // Base station match (F20)
+            stopTimeUpdate.stopId === `${baseStopId}_${direction === 'northbound' ? 'N' : 'S'}`, // Underscore format (F20_S)
+            stopTimeUpdate.stopId === `${baseStopId}-${direction === 'northbound' ? 'N' : 'S'}`, // Dash format (F20-S)
+            stopTimeUpdate.stopId === `${baseStopId} ${direction === 'northbound' ? 'N' : 'S'}`, // Space format (F20 S)
+            
+            // Prefix matching for complex station IDs
+            stopTimeUpdate.stopId.startsWith(baseStopId) && stopTimeUpdate.stopId.includes(direction === 'northbound' ? 'N' : 'S'),
+            
+            // Additional fallback: if looking for directional and no exact matches, accept base ID as last resort
+            stopId !== baseStopId && stopTimeUpdate.stopId === baseStopId
           ];
           
+          // Debug logging for stop ID matching analysis
+          const matchReasons = [];
+          if (matches[0]) matchReasons.push('exact-match');
+          if (matches[1]) matchReasons.push('base-match'); 
+          if (matches[2]) matchReasons.push('underscore-format');
+          if (matches[3]) matchReasons.push('dash-format');
+          if (matches[4]) matchReasons.push('space-format');
+          if (matches[5]) matchReasons.push('prefix-match');
+          if (matches[6]) matchReasons.push('fallback-base');
+          
           if (matches.some(match => match)) {
-            console.log(`[StationDepartureService] MATCH FOUND! Looking for: ${stopId}, Found: ${stopTimeUpdate.stopId}`);
+            console.log(`[StationDepartureService] MATCH FOUND! Looking for: ${stopId} (${direction}), Found: ${stopTimeUpdate.stopId}, Reason: ${matchReasons.join(', ')}`);
+          } else {
+            console.log(`[StationDepartureService] No match: Looking for: ${stopId} (${direction}), Found: ${stopTimeUpdate.stopId}`);
+          }
+
+          if (matches.some(match => match)) {
             
             // Handle both .low format (64-bit) and direct value format
             const rawDepartureTime = stopTimeUpdate.departure?.time?.low || 

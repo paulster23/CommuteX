@@ -94,8 +94,61 @@ describe('StationDatabase', () => {
     
     expect(carrollStation).toBeDefined();
     
+    // Carroll St now has GTFS mapping, so test with another station that doesn't
+    const twentyThirdStation = StationDatabase.getStationById('F18');
+    expect(twentyThirdStation).toBeDefined();
+    
     // Should return default station ID when no GTFS mapping exists
+    expect(StationDatabase.getGtfsIdForLine(twentyThirdStation!, 'F')).toBe('F18');
+    expect(StationDatabase.getGtfsIdForLine(twentyThirdStation!, 'M')).toBe('F18'); // M line has no specific mapping
+  });
+
+  test('shouldIncludeGLineAtCarrollSt', () => {
+    // Red: Test that Carroll St station includes G line support
+    const carrollStation = StationDatabase.getStationById('F20');
+    
+    expect(carrollStation).toBeDefined();
+    expect(carrollStation?.lines).toContain('F');
+    expect(carrollStation?.lines).toContain('G');
+  });
+
+  test('shouldReturnCorrectGtfsIdForGTrainAtCarrollSt', () => {
+    // Red: Test that G train has proper GTFS ID mapping at Carroll St
+    const carrollStation = StationDatabase.getStationById('F20');
+    
+    expect(carrollStation).toBeDefined();
+    
+    // F train should use F20, G train should use different GTFS ID
     expect(StationDatabase.getGtfsIdForLine(carrollStation!, 'F')).toBe('F20');
-    expect(StationDatabase.getGtfsIdForLine(carrollStation!, 'G')).toBe('F20');
+    expect(StationDatabase.getGtfsIdForLine(carrollStation!, 'G')).toBe('G22'); // Will fail until we implement
+  });
+
+  test('shouldFindCarrollStForSpecificLocation', () => {
+    // Red: Test that location 40.681414, -74.003240 finds Carroll St as nearest station
+    const nearestStation = StationDatabase.getNearestStation(40.681414, -74.003240);
+    
+    expect(nearestStation).toBeDefined();
+    expect(nearestStation?.station.name).toBe('Carroll St');
+    expect(nearestStation?.station.lines).toContain('F');
+    expect(nearestStation?.station.lines).toContain('G');
+  });
+
+  test('shouldFindJayStMetroTechForSpecificLocation', () => {
+    // Red: Test that location 40.692502, -73.986329 finds Jay St-MetroTech with A,C,F,R trains
+    const nearestStation = StationDatabase.getNearestStation(40.692502, -73.986329);
+    
+    expect(nearestStation).toBeDefined();
+    expect(nearestStation?.station.name).toBe('Jay St-MetroTech');
+    expect(nearestStation?.station.lines).toContain('A');
+    expect(nearestStation?.station.lines).toContain('C');
+    expect(nearestStation?.station.lines).toContain('F');
+    expect(nearestStation?.station.lines).toContain('R');
+    
+    // Should have proper GTFS ID mappings for all lines
+    const station = nearestStation!.station;
+    expect(StationDatabase.getGtfsIdForLine(station, 'A')).toBe('A41');
+    expect(StationDatabase.getGtfsIdForLine(station, 'C')).toBe('A41');
+    expect(StationDatabase.getGtfsIdForLine(station, 'F')).toBe('F25');
+    expect(StationDatabase.getGtfsIdForLine(station, 'R')).toBe('R29');
   });
 });

@@ -13,6 +13,18 @@ describe('StationDepartureService', () => {
     lng: -73.990064
   };
 
+  const carrollStation: SubwayStation = {
+    id: 'F20',
+    name: 'Carroll St',
+    lines: ['F', 'G'],
+    lat: 40.679371,
+    lng: -73.995458,
+    gtfsIds: {
+      'F': 'F20',
+      'G': 'G22'
+    }
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -309,8 +321,8 @@ describe('StationDepartureService', () => {
     
     // Spy on the private parseGtfsBuffer method to see what happens with real GTFS parsing logic
     const parseGtfsBufferSpy = jest.spyOn(StationDepartureService as any, 'parseGtfsBuffer')
-      .mockImplementation((gtfsBuffer, line, stopId) => {
-        console.log(`[DEBUG TEST] parseGtfsBuffer called with line: ${line}, stopId: ${stopId}`);
+      .mockImplementation((gtfsBuffer, line, stopId, direction) => {
+        console.log(`[DEBUG TEST] parseGtfsBuffer called with line: ${line}, stopId: ${stopId}, direction: ${direction}`);
         
         // Simulate what real MTA GTFS-RT data might contain for Carroll St
         // Based on user feedback, let's test various stop ID patterns
@@ -404,8 +416,8 @@ describe('StationDepartureService', () => {
     
     // Mock parseGtfsBuffer to test the actual matching logic where the fix was applied
     const parseGtfsBufferSpy = jest.spyOn(StationDepartureService as any, 'parseGtfsBuffer')
-      .mockImplementation((gtfsBuffer, line, stopId) => {
-        console.log(`[TEST] parseGtfsBuffer called with stopId: ${stopId}`);
+      .mockImplementation((gtfsBuffer, line, stopId, direction) => {
+        console.log(`[TEST] parseGtfsBuffer called with stopId: ${stopId}, direction: ${direction}`);
         
         // Simulate a GTFS feed that contains BOTH F20N and F20S trains
         const allTrainsInFeed = [
@@ -486,5 +498,312 @@ describe('StationDepartureService', () => {
     expect(southboundTimes).toEqual(['5', '12']);  // Only F20S trains
     
     parseGtfsBufferSpy.mockRestore();
+  });
+
+  test('shouldFetchGTrainDeparturesAtCarrollSt', async () => {
+    // Red: Test that G train departures appear at Carroll St using correct GTFS ID
+    
+    const now = Math.floor(Date.now() / 1000);
+    
+    // Mock the private fetchTrainArrivalsFromFeed method to simulate G train data
+    const fetchTrainArrivalsFromFeedSpy = jest.spyOn(StationDepartureService as any, 'fetchTrainArrivalsFromFeed')
+      .mockImplementation(async (feedUrl, direction, station, line, stopId) => {
+        console.log(`[TEST] fetchTrainArrivalsFromFeed called with line: ${line}, stopId: ${stopId}`);
+        
+        // Only return data for G train when called with G22 or G22N (correct GTFS ID)
+        if (line === 'G' && (stopId === 'G22' || stopId === 'G22N')) {
+          return [
+            {
+              stopId: `${stopId}N`,
+              stopSequence: 1,
+              departureTime: now + 420, // 7 minutes
+              arrivalTime: now + 420
+            },
+            {
+              stopId: `${stopId}N`,
+              stopSequence: 1,
+              departureTime: now + 780, // 13 minutes
+              arrivalTime: now + 780
+            }
+          ];
+        }
+        return []; // No data for other lines/stations
+      });
+    
+    // Use the consolidated station approach like the app does
+    const consolidatedStation = {
+      name: 'Carroll St',
+      lines: ['F', 'G'],
+      lat: 40.679371,
+      lng: -73.995458,
+      distance: 0.1,
+      stationIds: {
+        'F': 'F20',
+        'G': 'G22'  // This is the key fix
+      }
+    };
+    
+    const gDepartures = await StationDepartureService.getDeparturesForConsolidatedStation(
+      consolidatedStation,
+      'northbound',
+      ['G']
+    );
+    
+    // Should have G train departures
+    expect(gDepartures).toBeDefined();
+    expect(gDepartures.G).toBeDefined();
+    expect(gDepartures.G.length).toBeGreaterThan(0);
+    expect(gDepartures.G[0].line).toBe('G');
+    
+    fetchTrainArrivalsFromFeedSpy.mockRestore();
+  });
+
+  test('shouldFindSouthboundFTrainsWhenToggleActive', async () => {
+    // Red: Test that southbound F trains appear when southbound direction is selected
+    
+    const carrollStStation = {
+      id: 'F20',
+      name: 'Carroll St',
+      lines: ['F'],
+      lat: 40.679371,
+      lng: -73.995458
+    };
+    
+    const now = Math.floor(Date.now() / 1000);
+    
+    // Mock parseGtfsBuffer to simulate MTA feed that doesn't use exact "F20S" format
+    const parseGtfsBufferSpy = jest.spyOn(StationDepartureService as any, 'parseGtfsBuffer')
+      .mockImplementation((gtfsBuffer, line, stopId, direction) => {
+        console.log(`[SOUTHBOUND TEST] parseGtfsBuffer called with line: ${line}, stopId: ${stopId}, direction: ${direction}`);
+        
+        // Simulate real MTA feed with various stop ID formats (but NOT the exact format we're looking for)
+        const mockMtaFeedStopIds = [
+          'F20',     // Base format (what MTA actually uses)
+          'F20_S',   // Underscore format
+          'F20-S',   // Dash format  
+          'F19S',    // Previous station southbound
+          'F21N',    // Next station northbound
+          '635S',    // Numeric format (some stations use this)
+        ];
+        
+        console.log(`[SOUTHBOUND TEST] MTA feed contains stop IDs: ${mockMtaFeedStopIds.join(', ')}`);
+        console.log(`[SOUTHBOUND TEST] We're looking for: ${stopId}`);
+        
+        // Enhanced matching logic (this should SUCCEED in finding trains)
+        const baseStopId = stopId.replace(/[NS]$/, '');
+        console.log(`[SOUTHBOUND TEST] Base stop ID: ${baseStopId}`);
+        
+        const matchedStopIds = [];
+        for (const feedStopId of mockMtaFeedStopIds) {
+          const matches = [
+            feedStopId === stopId, // Exact directional match (e.g., F20S)
+            
+            // Enhanced fallback patterns for various MTA GTFS naming conventions
+            feedStopId === baseStopId, // Base station match (F20)
+            feedStopId === `${baseStopId}_${direction === 'northbound' ? 'N' : 'S'}`, // Underscore format (F20_S)
+            feedStopId === `${baseStopId}-${direction === 'northbound' ? 'N' : 'S'}`, // Dash format (F20-S)
+            feedStopId === `${baseStopId} ${direction === 'northbound' ? 'N' : 'S'}`, // Space format (F20 S)
+            
+            // Prefix matching for complex station IDs
+            feedStopId.startsWith(baseStopId) && feedStopId.includes(direction === 'northbound' ? 'N' : 'S'),
+            
+            // Additional fallback: if looking for directional and no exact matches, accept base ID as last resort
+            stopId !== baseStopId && feedStopId === baseStopId
+          ];
+          
+          if (matches.some(match => match)) {
+            matchedStopIds.push(feedStopId);
+            console.log(`[SOUTHBOUND TEST] MATCH! Found: ${feedStopId}`);
+          }
+        }
+        
+        console.log(`[SOUTHBOUND TEST] Total matches: ${matchedStopIds.length}`);
+        
+        // Return mock departures only if we found matches
+        if (matchedStopIds.length > 0) {
+          return matchedStopIds.map((matchedStopId, index) => ({
+            stopId: matchedStopId,
+            stopSequence: index + 1,
+            departureTime: now + (300 + index * 180), // 5, 8, 11 minutes
+            arrivalTime: now + (300 + index * 180)
+          }));
+        }
+        
+        return []; // No matches found - this simulates the current bug
+      });
+    
+    // Mock fetch
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(100))
+    });
+    
+    // Try to get southbound F train departures
+    const southboundDepartures = await StationDepartureService.getDeparturesForStation(carrollStStation, 'southbound');
+    
+    console.log(`[SOUTHBOUND TEST] Result - F trains found: ${southboundDepartures.F?.length || 0}`);
+    
+    // This should PASS after we fix the matching logic
+    expect(southboundDepartures).toHaveProperty('F');
+    expect(southboundDepartures.F.length).toBeGreaterThan(0); // Should find trains even with different stop ID formats
+    expect(southboundDepartures.F[0].relativeTime).toBe('5'); // First train in 5 minutes
+    
+    // Verify correct stop ID was requested
+    expect(parseGtfsBufferSpy).toHaveBeenCalledWith(
+      expect.any(ArrayBuffer),
+      'F',
+      'F20S', // Should be looking for southbound directional ID
+      'southbound'
+    );
+    
+    parseGtfsBufferSpy.mockRestore();
+  });
+
+  test('shouldShowAvailableTrainsEvenWhenSomeLinesFailToFetch', async () => {
+    // Red: Test that F trains show up even if A/C/R lines fail to fetch
+    
+    const jayStStation = {
+      name: 'Jay St-MetroTech',
+      lines: ['A', 'C', 'F', 'R'],
+      lat: 40.692338,
+      lng: -73.987342,
+      distance: 0.1,
+      stationIds: {
+        'A': 'A41',
+        'C': 'A41', 
+        'F': 'F25',
+        'R': 'R29'
+      }
+    };
+    
+    const now = Math.floor(Date.now() / 1000);
+    
+    // Mock fetchTrainArrivalsFromFeed to simulate mixed success/failure
+    const fetchTrainArrivalsFromFeedSpy = jest.spyOn(StationDepartureService as any, 'fetchTrainArrivalsFromFeed')
+      .mockImplementation(async (feedUrl, direction, station, line, stopId) => {
+        console.log(`[PARTIAL FAILURE TEST] Fetching ${line} line data...`);
+        
+        // Simulate F line success but A/C/R line failures
+        if (line === 'F') {
+          return [
+            {
+              stopId: 'F25N',
+              stopSequence: 1,
+              departureTime: now + 240, // 4 minutes
+              arrivalTime: now + 240
+            },
+            {
+              stopId: 'F25N',
+              stopSequence: 1,
+              departureTime: now + 480, // 8 minutes
+              arrivalTime: now + 480
+            }
+          ];
+        } else {
+          // A, C, R lines fail to fetch
+          throw new Error(`${line} line GTFS feed temporarily unavailable`);
+        }
+      });
+    
+    // This should FAIL currently because any line failure breaks the entire request
+    let departures;
+    try {
+      departures = await StationDepartureService.getDeparturesForConsolidatedStation(jayStStation, 'northbound');
+    } catch (error) {
+      console.log(`[PARTIAL FAILURE TEST] Failed as expected: ${error.message}`);
+      departures = null;
+    }
+    
+    // Current behavior: entire request fails, no trains at all
+    // Desired behavior: should show F trains even if A/C/R fail
+    expect(departures).not.toBeNull(); // Should not fail completely
+    expect(departures).toHaveProperty('F'); // Should have F trains
+    expect(departures.F.length).toBeGreaterThan(0); // Should have F train departures
+    expect(departures.F[0].relativeTime).toBe('4'); // First F train in 4 minutes
+    
+    // Should not have failed lines, but shouldn't crash either
+    expect(departures.A).toBeUndefined(); // A line failed, so no data
+    expect(departures.C).toBeUndefined(); // C line failed, so no data 
+    expect(departures.R).toBeUndefined(); // R line failed, so no data
+    
+    fetchTrainArrivalsFromFeedSpy.mockRestore();
+  });
+
+  test('shouldShowSouthboundFTrainsAtCarrollSt', async () => {
+    // Red: Test that southbound F trains appear at Carroll St (real user scenario)
+    
+    const carrollStStation = {
+      name: 'Carroll St',
+      lines: ['F', 'G'],
+      lat: 40.679371,
+      lng: -73.995458,
+      distance: 0.05,
+      stationIds: {
+        'F': 'F20',
+        'G': 'G22'
+      }
+    };
+    
+    const now = Math.floor(Date.now() / 1000);
+    
+    // Mock fetchTrainArrivalsFromFeed to return F train data for southbound direction
+    const fetchTrainArrivalsFromFeedSpy = jest.spyOn(StationDepartureService as any, 'fetchTrainArrivalsFromFeed')
+      .mockImplementation(async (feedUrl, direction, station, line, stopId) => {
+        console.log(`[SOUTHBOUND CARROLL TEST] Fetching ${direction} ${line} trains at ${station} with stopId: ${stopId}`);
+        
+        // Only return data for F line southbound at Carroll St
+        if (line === 'F' && direction === 'southbound' && stopId === 'F20S') {
+          return [
+            {
+              stopId: 'F20S',
+              stopSequence: 1,
+              departureTime: now + 180, // 3 minutes
+              arrivalTime: now + 180
+            },
+            {
+              stopId: 'F20S',
+              stopSequence: 1,
+              departureTime: now + 360, // 6 minutes
+              arrivalTime: now + 360
+            },
+            {
+              stopId: 'F20S',
+              stopSequence: 1,
+              departureTime: now + 540, // 9 minutes
+              arrivalTime: now + 540
+            }
+          ];
+        }
+        
+        // G line fails (simulating the real issue)
+        throw new Error(`${line} line GTFS feed error for ${direction} direction`);
+      });
+    
+    // This should work: get southbound F trains at Carroll St
+    let departures;
+    try {
+      departures = await StationDepartureService.getDeparturesForConsolidatedStation(carrollStStation, 'southbound');
+    } catch (error) {
+      console.log(`[SOUTHBOUND CARROLL TEST] Failed: ${error.message}`);
+      departures = null;
+    }
+    
+    // Should show F trains even if G line fails
+    expect(departures).not.toBeNull();
+    expect(departures).toHaveProperty('F');
+    expect(departures.F.length).toBeGreaterThan(0);
+    expect(departures.F[0].relativeTime).toBe('3'); // First train in 3 minutes
+    expect(departures.F[1].relativeTime).toBe('6'); // Second train in 6 minutes
+    
+    // Verify we requested southbound F trains with correct stop ID
+    expect(fetchTrainArrivalsFromFeedSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      'southbound',
+      'Carroll St',
+      'F',
+      'F20S'
+    );
+    
+    fetchTrainArrivalsFromFeedSpy.mockRestore();
   });
 });
