@@ -125,29 +125,30 @@ export class RealMTAService {
   private readonly ALERTS_FEED_URL_FALLBACK = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-alerts';
   
   // Dynamic station ID getters using StationDatabase
+  // Updated to use correct station IDs from the new comprehensive 472-station database
   public getCarrollStStopId(): string {
-    const station = StationDatabase.getStationById('F20');
-    return station ? StationDatabase.getGtfsIdForLine(station, 'F') : 'F20';
+    const station = StationDatabase.getStationById('F21'); // Updated from F20 to F21
+    return station ? StationDatabase.getGtfsIdForLine(station, 'F') : 'F21';
   }
   
   private getTwentyThirdStStopId(): string {
-    const station = StationDatabase.getStationById('F18');
-    return station ? StationDatabase.getGtfsIdForLine(station, 'F') : 'F18';
+    const station = StationDatabase.getStationById('D18'); // Updated from F18 to D18
+    return station ? StationDatabase.getGtfsIdForLine(station, 'F') : 'D18';
   }
   
   private getJayStStopIdForLine(line: 'F' | 'A' | 'C'): string {
-    const station = StationDatabase.getStationById('JAY_ST_METROTECH');
-    return station ? StationDatabase.getGtfsIdForLine(station, line) : (line === 'F' ? 'F25' : 'A41');
+    const station = StationDatabase.getStationById('A41'); // Updated from JAY_ST_METROTECH to A41
+    return station ? StationDatabase.getGtfsIdForLine(station, line) : 'A41';
   }
   
   private getTwentyThirdStCStopId(): string {
-    const station = StationDatabase.getStationById('A23');
-    return station ? StationDatabase.getGtfsIdForLine(station, 'C') : 'A23';
+    const station = StationDatabase.getStationById('A30'); // Updated from A23 to A30
+    return station ? StationDatabase.getGtfsIdForLine(station, 'C') : 'A30';
   }
   
   private getFourteenthStAStopId(): string {
-    const station = StationDatabase.getStationById('A27');
-    return station ? StationDatabase.getGtfsIdForLine(station, 'A') : 'A27';
+    const station = StationDatabase.getStationById('A31'); // Updated from A27 to A31
+    return station ? StationDatabase.getGtfsIdForLine(station, 'A') : 'A31';
   }
   
   constructor(locationProvider?: LocationProvider) {
@@ -217,7 +218,7 @@ export class RealMTAService {
     }
 
     // Calculate transit time using GTFS data instead of hardcoded value
-    const transitTime = await this.calculateGTFSTransitTime('F20', 'F18', 'F');
+    const transitTime = await this.calculateGTFSTransitTime('F21', 'D18', 'F');
     
     const config: RouteConfig = {
       direction: 'northbound',
@@ -558,26 +559,47 @@ export class RealMTAService {
     targetArrival: string
   ): Promise<Route[]> {
     try {
-      console.log('[RealMTAService] Calculating all afternoon routes (direct F + C→F transfer)');
+      console.log('[RealMTAService] ========== AFTERNOON ROUTE CALCULATION DEBUG ==========');
+      console.log(`[AfternoonRoutes] Origin: ${origin}, Destination: ${destination}, Target: ${targetArrival}`);
+      console.log('[RealMTAService] Calculating all afternoon routes (direct F + C→F transfer + C→A→F triple)');
       
       // Get direct F train routes
-      console.log('[AfternoonRoutes] Step 1: Calculating direct F train routes');
+      console.log('[AfternoonRoutes] === STEP 1: Direct F Train Routes ===');
       const directRoutes = await this.calculateAfternoonRoutes(origin, destination, targetArrival);
-      console.log(`[AfternoonRoutes] Direct F routes: ${directRoutes.length} generated`);
+      console.log(`[AfternoonRoutes] ✓ Direct F routes: ${directRoutes.length} generated`);
+      if (directRoutes.length > 0) {
+        console.log(`[AfternoonRoutes] Direct route example: ${directRoutes[0].method} - ${directRoutes[0].arrivalTime} (${directRoutes[0].duration})`);
+      }
       
       // Get C→F transfer routes
-      console.log('[AfternoonRoutes] Step 2: Calculating C→F transfer routes');
+      console.log('[AfternoonRoutes] === STEP 2: C→F Transfer Routes ===');
       const transferRoutes = await this.calculateAfternoonTransferRoutes(origin, destination, targetArrival);
-      console.log(`[AfternoonRoutes] C→F transfer routes: ${transferRoutes.length} generated`);
+      console.log(`[AfternoonRoutes] ✓ C→F transfer routes: ${transferRoutes.length} generated`);
+      if (transferRoutes.length > 0) {
+        console.log(`[AfternoonRoutes] Transfer route example: ${transferRoutes[0].method} - ${transferRoutes[0].arrivalTime} (${transferRoutes[0].duration})`);
+      } else {
+        console.warn(`[AfternoonRoutes] ⚠️ NO C→F transfer routes generated! This suggests an issue with C train data or transfer logic.`);
+      }
       
       // Get C/E→A→F triple-transfer routes
-      console.log('[AfternoonRoutes] Step 3: Calculating C→A→F triple-transfer routes');
+      console.log('[AfternoonRoutes] === STEP 3: C→A→F Triple-Transfer Routes ===');
       const tripleTransferRoutes = await this.calculateAfternoonTripleTransferRoutes(origin, destination, targetArrival);
-      console.log(`[AfternoonRoutes] C→A→F triple-transfer routes: ${tripleTransferRoutes.length} generated`);
+      console.log(`[AfternoonRoutes] ✓ C→A→F triple-transfer routes: ${tripleTransferRoutes.length} generated`);
+      if (tripleTransferRoutes.length > 0) {
+        console.log(`[AfternoonRoutes] Triple route example: ${tripleTransferRoutes[0].method} - ${tripleTransferRoutes[0].arrivalTime} (${tripleTransferRoutes[0].duration})`);
+      } else {
+        console.warn(`[AfternoonRoutes] ⚠️ NO C→A→F triple-transfer routes generated! This suggests an issue with ACE feed data.`);
+      }
       
       // Combine all routes
       const allRoutes = [...directRoutes, ...transferRoutes, ...tripleTransferRoutes];
+      console.log(`[AfternoonRoutes] === ROUTE COMBINATION RESULTS ===`);
       console.log(`[AfternoonRoutes] Total routes before sorting: ${allRoutes.length} (${directRoutes.length} direct + ${transferRoutes.length} transfer + ${tripleTransferRoutes.length} triple)`);
+      
+      if (allRoutes.length === directRoutes.length && directRoutes.length > 0) {
+        console.error(`[AfternoonRoutes] 🚨 ISSUE DETECTED: Only direct F routes available! Transfer routes are not being generated.`);
+        console.error(`[AfternoonRoutes] This explains why user only sees direct F trains in afternoon.`);
+      }
       
       // Sort by arrival time at destination
       allRoutes.sort((a, b) => {
@@ -588,11 +610,17 @@ export class RealMTAService {
       
       // Limit to 5 routes
       const limitedRoutes = allRoutes.slice(0, 5);
+      console.log(`[AfternoonRoutes] Final route selection (top 5):`);
+      limitedRoutes.forEach((route, i) => {
+        console.log(`[AfternoonRoutes] ${i + 1}. ${route.method} - ${route.arrivalTime} (${route.duration}, ${route.transfers} transfers)`);
+      });
       
-      // Enrich routes with service alert information (afternoon = direction 1 = northbound)
-      const enrichedRoutes = await this.enrichRoutesWithAlerts(limitedRoutes, 1);
+      // Enrich routes with service alert information (afternoon = direction 0 = southbound) 
+      // Note: afternoon commute is southbound (work→home), not northbound
+      const enrichedRoutes = await this.enrichRoutesWithAlerts(limitedRoutes, 0);
       
-      console.log(`[RealMTAService] Generated ${enrichedRoutes.length} total afternoon routes (from ${directRoutes.length} direct, ${transferRoutes.length} transfer, ${tripleTransferRoutes.length} triple-transfer)`);
+      console.log(`[RealMTAService] ========== AFTERNOON ROUTE CALCULATION COMPLETE ==========`);
+      console.log(`[RealMTAService] FINAL RESULT: ${enrichedRoutes.length} total afternoon routes delivered to UI`);
       return enrichedRoutes;
       
     } catch (error) {
@@ -611,7 +639,7 @@ export class RealMTAService {
     targetArrival: string
   ): Promise<Route[]> {
     // Calculate transit time using GTFS data instead of hardcoded value
-    const transitTime = await this.calculateGTFSTransitTime('F18', 'F20', 'F');
+    const transitTime = await this.calculateGTFSTransitTime('D18', 'F21', 'F');
     
     const config: RouteConfig = {
       direction: 'southbound',
@@ -693,6 +721,7 @@ export class RealMTAService {
     targetArrival: string
   ): Promise<Route[]> {
     try {
+      console.log('[AfternoonTransfer] ========== C→F TRANSFER ROUTE DEBUG ==========');
       console.log('[RealMTAService] Calculating C→F transfer routes from 23rd St to Carroll St');
       console.log('[AfternoonTransfer] Starting afternoon C→F transfer route calculation');
       
@@ -700,6 +729,18 @@ export class RealMTAService {
       const walkingFromStation = await this.locationProvider.getWalkingTimeFromCarrollStToHome();
       
       console.log(`[AfternoonTransfer] Walking times - to station: ${walkingToStation} min, from station: ${walkingFromStation} min`);
+      
+      // Debug the station ID lookups
+      const cStopId = this.getTwentyThirdStCStopId();
+      const cJayStopId = this.getJayStStopIdForLine('C');
+      const fJayStopId = this.getJayStStopIdForLine('F');
+      const fCarrollStopId = this.getCarrollStStopId();
+      
+      console.log(`[AfternoonTransfer] === STATION ID VERIFICATION ===`);
+      console.log(`[AfternoonTransfer] 23rd St-8th Ave (C): ${cStopId}`);
+      console.log(`[AfternoonTransfer] Jay St-MetroTech (C): ${cJayStopId}`);
+      console.log(`[AfternoonTransfer] Jay St-MetroTech (F): ${fJayStopId}`);
+      console.log(`[AfternoonTransfer] Carroll St (F): ${fCarrollStopId}`);
       
       // Create reverse transfer route configuration
       const transferConfig: TransferRouteConfig = {
@@ -710,8 +751,8 @@ export class RealMTAService {
             fromStation: '23rd St-8th Ave',
             toStation: 'Jay St-MetroTech',
             feedUrl: this.ACE_TRAIN_FEED_URL,
-            startStopId: this.getTwentyThirdStCStopId(),
-            endStopId: this.getJayStStopIdForLine('C')
+            startStopId: cStopId,
+            endStopId: cJayStopId
           },
           {
             line: 'F',
@@ -719,8 +760,8 @@ export class RealMTAService {
             fromStation: 'Jay St-MetroTech',
             toStation: 'Carroll St',
             feedUrl: this.F_TRAIN_FEED_URL,
-            startStopId: this.getJayStStopIdForLine('F'),
-            endStopId: this.getCarrollStStopId()
+            startStopId: fJayStopId,
+            endStopId: fCarrollStopId
           }
         ],
         transferStations: [
@@ -729,25 +770,45 @@ export class RealMTAService {
             transferTime: 0, // Instant transfer
             fromLine: 'C',
             toLine: 'F',
-            fromStopId: this.getJayStStopIdForLine('C'),
-            toStopId: this.getJayStStopIdForLine('F')
+            fromStopId: cJayStopId,
+            toStopId: fJayStopId
           }
         ],
         getWalkingToStation: () => Promise.resolve(walkingToStation),
         getWalkingFromStation: () => Promise.resolve(walkingFromStation)
       };
       
-      console.log(`[AfternoonTransfer] Transfer config - C train: ${transferConfig.segments[0].startStopId} → ${transferConfig.segments[0].endStopId}`);
-      console.log(`[AfternoonTransfer] Transfer config - F train: ${transferConfig.segments[1].startStopId} → ${transferConfig.segments[1].endStopId}`);
-      console.log(`[AfternoonTransfer] Using ACE feed: ${this.ACE_TRAIN_FEED_URL}`);
-      console.log(`[AfternoonTransfer] Using F feed: ${this.F_TRAIN_FEED_URL}`);
+      console.log(`[AfternoonTransfer] === TRANSFER CONFIGURATION ===`);
+      console.log(`[AfternoonTransfer] Segment 1 (C train southbound): ${transferConfig.segments[0].startStopId} → ${transferConfig.segments[0].endStopId}`);
+      console.log(`[AfternoonTransfer] Segment 2 (F train southbound): ${transferConfig.segments[1].startStopId} → ${transferConfig.segments[1].endStopId}`);
+      console.log(`[AfternoonTransfer] ACE feed URL: ${this.ACE_TRAIN_FEED_URL}`);
+      console.log(`[AfternoonTransfer] F feed URL: ${this.F_TRAIN_FEED_URL}`);
       
+      console.log(`[AfternoonTransfer] === CALLING TRANSFER CALCULATION ===`);
       const result = await this.calculateTransferRoutesForConfig(transferConfig, targetArrival);
+      
+      console.log(`[AfternoonTransfer] === TRANSFER CALCULATION RESULT ===`);
       console.log(`[AfternoonTransfer] C→F transfer calculation completed - generated ${result.length} routes`);
+      
+      if (result.length === 0) {
+        console.error(`[AfternoonTransfer] 🚨 ZERO C→F transfer routes generated!`);
+        console.error(`[AfternoonTransfer] This indicates either:`);
+        console.error(`[AfternoonTransfer] 1. ACE feed (C train) has no southbound data`);
+        console.error(`[AfternoonTransfer] 2. F feed has no southbound data`);
+        console.error(`[AfternoonTransfer] 3. Station IDs are incorrect`);
+        console.error(`[AfternoonTransfer] 4. No valid transfer connections found`);
+      } else {
+        console.log(`[AfternoonTransfer] ✓ Successfully generated C→F transfer routes`);
+        result.forEach((route, i) => {
+          console.log(`[AfternoonTransfer] Route ${i + 1}: ${route.method} - ${route.arrivalTime} (${route.duration})`);
+        });
+      }
+      
       return result;
       
     } catch (error) {
-      console.error('[RealMTAService] Failed to calculate afternoon transfer routes:', error);
+      console.error('[AfternoonTransfer] Transfer route calculation FAILED:', error);
+      console.error('[AfternoonTransfer] Error details:', error.message);
       throw new Error(`Unable to fetch afternoon transfer route data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -759,15 +820,28 @@ export class RealMTAService {
     config: TransferRouteConfig,
     targetArrival: string
   ): Promise<Route[]> {
+    console.log(`[Transfer] ========== CORE TRANSFER CALCULATION DEBUG ==========`);
     const routes: Route[] = [];
     const targetTime = this.parseTime(targetArrival);
     
     // Get walking times
     const walkingToStation = await config.getWalkingToStation();
     const walkingFromStation = await config.getWalkingFromStation();
+    console.log(`[Transfer] Walking times: to=${walkingToStation}min, from=${walkingFromStation}min`);
+    
+    // Debug the segments configuration
+    console.log(`[Transfer] === SEGMENT CONFIGURATION ===`);
+    config.segments.forEach((segment, i) => {
+      console.log(`[Transfer] Segment ${i + 1}: ${segment.line} ${segment.direction} from ${segment.fromStation} to ${segment.toStation}`);
+      console.log(`[Transfer] - Stop IDs: ${segment.startStopId} → ${segment.endStopId}`);
+      console.log(`[Transfer] - Feed URL: ${segment.feedUrl}`);
+    });
     
     // Fetch first segment train arrivals
     const firstSegment = config.segments[0];
+    console.log(`[Transfer] === FETCHING FIRST SEGMENT DATA ===`);
+    console.log(`[Transfer] Fetching ${firstSegment.line} ${firstSegment.direction} arrivals from ${firstSegment.fromStation} (${firstSegment.startStopId})`);
+    
     const firstSegmentArrivals = await this.fetchTrainArrivalsFromFeed(
       firstSegment.feedUrl,
       firstSegment.direction,
@@ -776,10 +850,17 @@ export class RealMTAService {
       firstSegment.startStopId
     );
     
-    console.log(`[Transfer] First segment (${firstSegment.line}): ${firstSegmentArrivals.length} arrivals`);
+    console.log(`[Transfer] ✓ First segment (${firstSegment.line}): ${firstSegmentArrivals.length} arrivals found`);
+    if (firstSegmentArrivals.length > 0) {
+      const firstArrival = new Date(firstSegmentArrivals[0].departureTime! * 1000);
+      console.log(`[Transfer] First ${firstSegment.line} train departs at: ${this.formatTime(firstArrival)}`);
+    }
     
     // Fetch second segment train arrivals
     const secondSegment = config.segments[1];
+    console.log(`[Transfer] === FETCHING SECOND SEGMENT DATA ===`);
+    console.log(`[Transfer] Fetching ${secondSegment.line} ${secondSegment.direction} arrivals from ${secondSegment.fromStation} (${secondSegment.startStopId})`);
+    
     const secondSegmentArrivals = await this.fetchTrainArrivalsFromFeed(
       secondSegment.feedUrl,
       secondSegment.direction,
@@ -788,16 +869,25 @@ export class RealMTAService {
       secondSegment.startStopId
     );
     
-    console.log(`[Transfer] Second segment (${secondSegment.line}): ${secondSegmentArrivals.length} arrivals`);
+    console.log(`[Transfer] ✓ Second segment (${secondSegment.line}): ${secondSegmentArrivals.length} arrivals found`);
+    if (secondSegmentArrivals.length > 0) {
+      const firstArrival = new Date(secondSegmentArrivals[0].departureTime! * 1000);
+      console.log(`[Transfer] First ${secondSegment.line} train departs at: ${this.formatTime(firstArrival)}`);
+    }
     
     // Validate arrivals data
+    console.log(`[Transfer] === ARRIVAL DATA VALIDATION ===`);
     if (firstSegmentArrivals.length === 0) {
-      console.warn(`[Transfer] No ${firstSegment.line} arrivals - transfer routes unavailable`);
+      console.error(`[Transfer] 🚨 CRITICAL: No ${firstSegment.line} arrivals found!`);
+      console.error(`[Transfer] This means the ${firstSegment.line} train feed has no ${firstSegment.direction} departures from ${firstSegment.fromStation}`);
+      console.error(`[Transfer] Check: 1) ACE feed connectivity 2) Station ID mapping 3) Direction mapping`);
       return [];
     }
     
     if (secondSegmentArrivals.length === 0) {
-      console.warn(`[Transfer] No ${secondSegment.line} arrivals - transfer routes unavailable`);
+      console.error(`[Transfer] 🚨 CRITICAL: No ${secondSegment.line} arrivals found!`);
+      console.error(`[Transfer] This means the ${secondSegment.line} train feed has no ${secondSegment.direction} departures from ${secondSegment.fromStation}`);
+      console.error(`[Transfer] Check: 1) F feed connectivity 2) Station ID mapping 3) Direction mapping`);
       return [];
     }
     
@@ -1646,7 +1736,7 @@ export class RealMTAService {
     
     // Add default stations for F train routes
     if (routeLines.includes('F')) {
-      routeStations.push('F20', 'F18'); // Carroll St, 23rd St
+      routeStations.push('F21', 'D18'); // Carroll St, 23rd St
     }
     
     // Get alerts for this specific commute
@@ -1711,11 +1801,11 @@ export class RealMTAService {
    */
   private getStationIdFromName(stationName: string): string | null {
     const stationMappings: { [key: string]: string } = {
-      'Carroll St': 'F20',
-      '23rd St': 'F18',
-      'Jay St-MetroTech': 'JAY_ST_METROTECH',
-      '23rd St-8th Ave': 'A23',
-      '14th St-8th Ave': 'A27'
+      'Carroll St': 'F21',
+      '23rd St': 'D18', 
+      'Jay St-MetroTech': 'A41',
+      '23rd St-8th Ave': 'A30',
+      '14th St-8th Ave': 'A31'
     };
     
     return stationMappings[stationName] || null;
@@ -1906,17 +1996,17 @@ export class RealMTAService {
     const stations = new Set<string>();
 
     // F-direct route stations: Carroll St → Jay St → 23rd St
-    stations.add('F20'); // Carroll St (origin)
-    stations.add('F24'); // Bergen St (intermediate on F line)
-    stations.add('F25'); // Jay St-MetroTech (F line)
-    stations.add('F18'); // 23rd St (F line destination)
+    stations.add('F21'); // Carroll St (origin) - updated from F20
+    stations.add('F24'); // Bergen St (intermediate on F line) - verify this exists
+    stations.add('A41'); // Jay St-MetroTech (F line) - updated from F25
+    stations.add('D18'); // 23rd St (F line destination) - updated from F18
 
     // F→C transfer route stations: Carroll St → Jay St → 23rd St-8th Ave
-    stations.add('A41'); // Jay St-MetroTech (A/C line)
-    stations.add('A23'); // 23rd St-8th Ave (C line destination)
+    stations.add('A41'); // Jay St-MetroTech (A/C line) - already added above
+    stations.add('A30'); // 23rd St-8th Ave (C line destination) - updated from A23
 
     // F→A→C triple-transfer route stations: Carroll St → Jay St → 14th St → 23rd St-8th Ave
-    stations.add('A27'); // 14th St-8th Ave (A/C transfer point)
+    stations.add('A31'); // 14th St-8th Ave (A/C transfer point) - updated from A27
 
     return Array.from(stations);
   }
@@ -1995,16 +2085,16 @@ export class RealMTAService {
       // TODO: Implement actual GTFS static data fetching
       const mockData = {
         stops: [
-          { stop_id: 'F20', stop_name: 'Carroll St', stop_lat: 40.679371, stop_lon: -73.995148 },
-          { stop_id: 'F18', stop_name: '23rd St', stop_lat: 40.742878, stop_lon: -73.992821 }
+          { stop_id: 'F21', stop_name: 'Carroll St', stop_lat: 40.679371, stop_lon: -73.995148 },
+          { stop_id: 'D18', stop_name: '23rd St', stop_lat: 40.742878, stop_lon: -73.992821 }
         ],
         stop_times: [
           // Northbound trip: Carroll St → 23rd St
-          { trip_id: 'F_TRIP_NORTH', stop_id: 'F20', stop_sequence: 1, arrival_time: '09:00:00', departure_time: '09:00:00' },
-          { trip_id: 'F_TRIP_NORTH', stop_id: 'F18', stop_sequence: 6, arrival_time: '09:34:00', departure_time: '09:34:00' },
+          { trip_id: 'F_TRIP_NORTH', stop_id: 'F21', stop_sequence: 1, arrival_time: '09:00:00', departure_time: '09:00:00' },
+          { trip_id: 'F_TRIP_NORTH', stop_id: 'D18', stop_sequence: 6, arrival_time: '09:34:00', departure_time: '09:34:00' },
           // Southbound trip: 23rd St → Carroll St  
-          { trip_id: 'F_TRIP_SOUTH', stop_id: 'F18', stop_sequence: 1, arrival_time: '17:00:00', departure_time: '17:00:00' },
-          { trip_id: 'F_TRIP_SOUTH', stop_id: 'F20', stop_sequence: 6, arrival_time: '17:34:00', departure_time: '17:34:00' }
+          { trip_id: 'F_TRIP_SOUTH', stop_id: 'D18', stop_sequence: 1, arrival_time: '17:00:00', departure_time: '17:00:00' },
+          { trip_id: 'F_TRIP_SOUTH', stop_id: 'F21', stop_sequence: 6, arrival_time: '17:34:00', departure_time: '17:34:00' }
         ]
       };
       
@@ -2074,9 +2164,14 @@ export class RealMTAService {
    */
   private getFallbackTransitTime(fromStopId: string, toStopId: string, line: string): number {
     // Fallback to segment-based calculation or reasonable estimates
-    if (fromStopId === 'F20' && toStopId === 'F18' && line === 'F') {
-      // Carroll St to 23rd St direct F train - use realistic estimate instead of hardcoded 18
+    if (fromStopId === 'F21' && toStopId === 'D18' && line === 'F') {
+      // Carroll St to 23rd St direct F train (northbound) - use realistic estimate instead of hardcoded 18
       return 34; // Based on actual NYC subway timing
+    }
+    
+    if (fromStopId === 'D18' && toStopId === 'F21' && line === 'F') {
+      // 23rd St to Carroll St direct F train (southbound) - use realistic estimate
+      return 34; // Same timing in reverse
     }
     
     // Default fallback for unknown routes
