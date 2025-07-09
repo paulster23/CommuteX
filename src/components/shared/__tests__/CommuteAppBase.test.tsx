@@ -7,7 +7,7 @@ import { RealMTAService } from '../../../services/RealMTAService';
 jest.mock('../../../services/RealMTAService');
 
 const mockMTAService = {
-  getServiceAlertsForLines: jest.fn(),
+  getServiceAlertsForCommute: jest.fn(),
 };
 
 jest.mock('lucide-react-native', () => ({
@@ -44,7 +44,7 @@ describe('CommuteAppBase Service Alerts', () => {
 
   test('shouldDisplayNoServiceAlertsWhenNoneExist', async () => {
     // Red: Test that "No active service alerts" is shown when no alerts exist
-    mockMTAService.getServiceAlertsForLines.mockResolvedValue([]);
+    mockMTAService.getServiceAlertsForCommute.mockResolvedValue([]);
     
     render(<CommuteAppBase config={mockConfig} />);
     
@@ -62,11 +62,21 @@ describe('CommuteAppBase Service Alerts', () => {
         headerText: 'F Train Service Change',
         descriptionText: 'F trains are delayed due to signal problems',
         affectedRoutes: ['F'],
-        severity: 'warning' as const
+        severity: 'warning' as const,
+        informedEntities: [
+          {
+            routeId: 'F',
+            directionId: 1
+          }
+        ],
+        activePeriod: {
+          start: new Date('2023-12-01T08:00:00Z'),
+          end: new Date('2023-12-01T18:00:00Z')
+        }
       }
     ];
     
-    mockMTAService.getServiceAlertsForLines.mockResolvedValue(mockAlerts);
+    mockMTAService.getServiceAlertsForCommute.mockResolvedValue(mockAlerts);
     
     render(<CommuteAppBase config={mockConfig} />);
     
@@ -77,12 +87,51 @@ describe('CommuteAppBase Service Alerts', () => {
     });
   });
 
+  test('shouldDisplayAlertTimeInEffect', async () => {
+    // Test that service alerts show time in effect information
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 8, 0); // 8 AM today
+    const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 18, 0);   // 6 PM today
+    
+    const mockAlerts = [
+      {
+        id: 'alert-1',
+        headerText: 'F Train Service Change',
+        descriptionText: 'F trains are delayed due to signal problems',
+        affectedRoutes: ['F'],
+        severity: 'warning' as const,
+        informedEntities: [
+          {
+            routeId: 'F',
+            directionId: 1
+          }
+        ],
+        activePeriod: {
+          start: todayStart,
+          end: todayEnd
+        }
+      }
+    ];
+    
+    mockMTAService.getServiceAlertsForCommute.mockResolvedValue(mockAlerts);
+    
+    render(<CommuteAppBase config={mockConfig} />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Service Alerts')).toBeTruthy();
+      expect(screen.getByText('F Train Service Change')).toBeTruthy();
+      expect(screen.getByText('F trains are delayed due to signal problems')).toBeTruthy();
+      // Check that time in effect is displayed
+      expect(screen.getByText(/Today 8:00 AM - 6:00 PM/)).toBeTruthy();
+    });
+  });
+
   test('shouldFilterAlertsForRelevantLines', async () => {
     // Red: Test that alerts are filtered for F, C, A lines only
     render(<CommuteAppBase config={mockConfig} />);
     
     await waitFor(() => {
-      expect(mockMTAService.getServiceAlertsForLines).toHaveBeenCalledWith(['F', 'C', 'A']);
+      expect(mockMTAService.getServiceAlertsForCommute).toHaveBeenCalledWith(['F', 'C', 'A'], 1);
     });
   });
 
@@ -146,12 +195,12 @@ describe('CommuteAppBase Service Alerts', () => {
 
     // Verify service alerts are also refreshed
     await waitFor(() => {
-      expect(mockMTAService.getServiceAlertsForLines).toHaveBeenCalledWith(['F', 'C', 'A']);
+      expect(mockMTAService.getServiceAlertsForCommute).toHaveBeenCalledWith(['F', 'C', 'A'], 1);
     });
 
     // Reset call counts
     mockCalculateRoutes.mockClear();
-    mockMTAService.getServiceAlertsForLines.mockClear();
+    mockMTAService.getServiceAlertsForCommute.mockClear();
 
     // Trigger refresh through RefreshControl
     const scrollView = getByTestId('scroll-view');
@@ -160,7 +209,7 @@ describe('CommuteAppBase Service Alerts', () => {
 
     // Verify both routes and service alerts are reloaded
     expect(mockCalculateRoutes).toHaveBeenCalledTimes(1);
-    expect(mockMTAService.getServiceAlertsForLines).toHaveBeenCalledWith(['F', 'C', 'A']);
+    expect(mockMTAService.getServiceAlertsForCommute).toHaveBeenCalledWith(['F', 'C', 'A'], 1);
   });
 
   test('shouldManageRefreshStateIndependentlyFromLoading', async () => {

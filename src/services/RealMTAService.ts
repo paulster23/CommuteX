@@ -1565,10 +1565,52 @@ export class RealMTAService {
         let activePeriod: { start?: Date; end?: Date } | undefined;
         if (alert.activePeriod && alert.activePeriod.length > 0) {
           const period = alert.activePeriod[0];
-          activePeriod = {
-            start: period.start ? new Date((period.start as any).low * 1000) : undefined,
-            end: period.end ? new Date((period.end as any).low * 1000) : undefined,
+          
+          // Helper function to safely parse GTFS-RT timestamp
+          const parseGtfsTimestamp = (timestamp: any): Date | undefined => {
+            if (!timestamp) return undefined;
+            
+            try {
+              let unixSeconds: number;
+              
+              // Handle different timestamp formats from GTFS-RT
+              if (typeof timestamp === 'number') {
+                unixSeconds = timestamp;
+              } else if (timestamp.low !== undefined) {
+                // 64-bit integer representation
+                unixSeconds = timestamp.low;
+              } else if (timestamp.toNumber) {
+                // Protocol buffer Long type
+                unixSeconds = timestamp.toNumber();
+              } else {
+                console.warn('[RealMTAService] Unknown timestamp format:', timestamp);
+                return undefined;
+              }
+              
+              const date = new Date(unixSeconds * 1000);
+              
+              // Validate the date
+              if (isNaN(date.getTime())) {
+                console.warn('[RealMTAService] Invalid date parsed from timestamp:', unixSeconds);
+                return undefined;
+              }
+              
+              return date;
+            } catch (error) {
+              console.warn('[RealMTAService] Error parsing timestamp:', timestamp, error);
+              return undefined;
+            }
           };
+          
+          activePeriod = {
+            start: parseGtfsTimestamp(period.start),
+            end: parseGtfsTimestamp(period.end),
+          };
+          
+          // Debug log for timing issues
+          if (process.env.DEBUG_ALERTS === 'true' && activePeriod.start) {
+            console.log(`[RealMTAService] Alert timing: ${activePeriod.start.toISOString()} - ${activePeriod.end?.toISOString() || 'ongoing'}`);
+          }
         }
 
         alerts.push({
@@ -1939,7 +1981,7 @@ export class RealMTAService {
    * Get prioritized alerts for commute (station-skipping alerts first, then by severity)
    */
   async getPrioritizedAlertsForCommute(lines: string[], direction: 0 | 1): Promise<ServiceAlert[]> {
-    const allAlerts = await this.getServiceAlerts();
+    const allAlerts = await this.getActiveServiceAlerts();
     const timeWindowAlerts = await this.getRelevantAlertsForTimeWindow(4 * 60 * 60 * 1000); // 4 hour window
     
     // Filter by lines and direction
