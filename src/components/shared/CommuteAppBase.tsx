@@ -4,6 +4,7 @@ import { Zap } from 'lucide-react-native';
 import { RealMTAService, Route, ServiceAlert } from '../../services/RealMTAService';
 import { RouteCard } from './RouteCard';
 import { getThemeStyles } from '../../design/components';
+import { colors } from '../../design/theme';
 
 interface CommuteConfig {
   title: string;
@@ -92,7 +93,12 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
 
   const loadServiceAlerts = async () => {
     try {
-      const alerts = await mtaService.getServiceAlertsForLines(['F', 'C', 'A']);
+      // Determine direction based on config.title
+      // Morning: Brooklyn → Manhattan = northbound = direction 1
+      // Afternoon: Manhattan → Brooklyn = southbound = direction 0
+      const direction = config.title.toLowerCase().includes('afternoon') ? 0 : 1;
+      
+      const alerts = await mtaService.getServiceAlertsForCommute(['F', 'C', 'A'], direction);
       setServiceAlerts(alerts);
     } catch (error) {
       console.error(`[${config.title}] Failed to load service alerts:`, error);
@@ -369,6 +375,48 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
             ) : (
               serviceAlerts.map((alert) => (
                 <View key={alert.id} style={{ marginBottom: 12 }}>
+                  {/* Icons and Direction Row */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    {/* Subway Line Icons */}
+                    <View style={{ flexDirection: 'row', marginRight: 12 }}>
+                      {alert.affectedRoutes.map((line) => (
+                        <View
+                          key={line}
+                          style={{
+                            backgroundColor: colors.subway[line as keyof typeof colors.subway] || styles.theme.colors.textSecondary,
+                            borderRadius: 12,
+                            width: 24,
+                            height: 24,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginRight: 6,
+                          }}
+                        >
+                          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+                            {line}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                    
+                    {/* Direction Arrows */}
+                    <View style={{ flexDirection: 'row' }}>
+                      {alert.informedEntities.map((entity, index) => (
+                        <Text
+                          key={index}
+                          style={{
+                            fontSize: 16,
+                            color: styles.theme.colors.textSecondary,
+                            marginRight: 4,
+                          }}
+                        >
+                          {entity.directionId === 0 ? '↓' : '↑'}
+                        </Text>
+                      ))}
+                    </View>
+                  </View>
+                  
+                  {/* Alert Text */}
                   <Text style={{ 
                     color: alert.severity === 'severe' ? styles.theme.colors.error : 
                            alert.severity === 'warning' ? '#F59E0B' : styles.theme.colors.text,
