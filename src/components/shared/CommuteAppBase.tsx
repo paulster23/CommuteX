@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, RefreshControl, useColorSchem
 import { Zap } from 'lucide-react-native';
 import { RealMTAService, Route, ServiceAlert } from '../../services/RealMTAService';
 import { RouteCard } from './RouteCard';
+import { CriticalAlertPill } from './CriticalAlertPill';
 import { getThemeStyles } from '../../design/components';
 import { colors } from '../../design/theme';
 import { useWebPullToRefresh } from '../../hooks/useWebPullToRefresh';
@@ -168,6 +169,7 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
   const [clockValidation, setClockValidation] = useState<TimeValidationResult | null>(null);
   
   const mtaService = new RealMTAService();
+
 
   const setDebugMessageCallback = useCallback((message: string) => {
     setDebugMessage(message);
@@ -480,6 +482,7 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
         </View>
       )}
 
+
       <ScrollView
         testID={config.title === 'Morning Commute' ? 'scroll-view' : 'afternoon-routes-container'}
         style={{ flex: 1, paddingHorizontal: 8 }}
@@ -551,105 +554,20 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
         {/* Service Alerts Section */}
         {routes.length > 0 && (
           <View style={[styles.card(), { marginTop: 20, marginBottom: 40 }]}>
-            <Text style={{ color: styles.theme.colors.text, fontSize: 18, fontWeight: '600', marginBottom: 8 }}>Service Alerts</Text>
+            <Text style={{ color: styles.theme.colors.text, fontSize: 18, fontWeight: '600', marginBottom: 8 }}>
+              Service Alerts
+            </Text>
             {serviceAlerts.length === 0 ? (
               <Text style={{ color: styles.theme.colors.textSecondary, fontSize: 14 }}>
                 No active service alerts for this route
               </Text>
             ) : (
               serviceAlerts.map((alert) => (
-                <View key={alert.id} style={{ marginBottom: 12 }}>
-                  {/* Icons and Direction Row */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                    {/* Subway Line Icons */}
-                    <View style={{ flexDirection: 'row', marginRight: 12 }}>
-                      {alert.affectedRoutes.map((line) => (
-                        <View
-                          key={line}
-                          style={{
-                            backgroundColor: colors.subway[line as keyof typeof colors.subway] || styles.theme.colors.textSecondary,
-                            borderRadius: 12,
-                            width: 24,
-                            height: 24,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            marginRight: 6,
-                          }}
-                        >
-                          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
-                            {line}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                    
-                    {/* Direction Arrows */}
-                    <View style={{ flexDirection: 'row' }}>
-                      {alert.informedEntities.map((entity, index) => (
-                        <Text
-                          key={index}
-                          style={{
-                            fontSize: 16,
-                            color: styles.theme.colors.textSecondary,
-                            marginRight: 4,
-                          }}
-                        >
-                          {entity.directionId === 0 ? '↓' : '↑'}
-                        </Text>
-                      ))}
-                    </View>
-                  </View>
-                  
-                  {/* Alert Text */}
-                  <Text style={{ 
-                    color: alert.severity === 'severe' ? styles.theme.colors.error : 
-                           alert.severity === 'warning' ? '#F59E0B' : styles.theme.colors.text,
-                    fontSize: 16, 
-                    fontWeight: '600', 
-                    marginBottom: 4 
-                  }}>
-                    {alert.headerText}
-                  </Text>
-                  <Text style={{ color: styles.theme.colors.textSecondary, fontSize: 14 }}>
-                    {alert.descriptionText}
-                  </Text>
-                  
-                  {/* Time in Effect */}
-                  {(() => {
-                    const timePeriod = formatAlertTimePeriod(alert.activePeriod);
-                    
-                    // Debug logging for timestamp parsing issues
-                    if (alert.activePeriod && !timePeriod) {
-                      console.warn('[CommuteAppBase] Alert has activePeriod but no formatted time:', {
-                        alertId: alert.id,
-                        start: alert.activePeriod.start,
-                        end: alert.activePeriod.end,
-                        startType: typeof alert.activePeriod.start,
-                        endType: typeof alert.activePeriod.end
-                      });
-                    }
-                    
-                    return timePeriod ? (
-                      <Text style={{ 
-                        color: styles.theme.colors.textTertiary, 
-                        fontSize: 12, 
-                        fontStyle: 'italic',
-                        marginTop: 4
-                      }}>
-                        {timePeriod}
-                      </Text>
-                    ) : alert.activePeriod ? (
-                      <Text style={{ 
-                        color: styles.theme.colors.textTertiary, 
-                        fontSize: 12, 
-                        fontStyle: 'italic',
-                        marginTop: 4
-                      }}>
-                        [Timing data parse error]
-                      </Text>
-                    ) : null;
-                  })()}
-                </View>
+                <CriticalAlertPill
+                  key={alert.id}
+                  alert={alert}
+                  isDarkMode={isDarkMode}
+                />
               ))
             )}
           </View>

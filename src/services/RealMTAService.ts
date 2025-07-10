@@ -1883,6 +1883,14 @@ export class RealMTAService {
     const soonThreshold = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes from now
     
     const activeAlerts = allAlerts.filter(alert => {
+      // Station-skipping alerts bypass time filtering (they're always critical)
+      if (this.isStationSkippingAlert(alert)) {
+        if (process.env.DEBUG_ALERTS === 'true') {
+          console.log(`[RealMTAService] Station-skipping alert ${alert.id} bypassed time filtering: "${alert.headerText}"`);
+        }
+        return true;
+      }
+      
       // If no activePeriod is specified, treat as always active
       if (!alert.activePeriod) {
         return true;
@@ -1896,7 +1904,13 @@ export class RealMTAService {
       const isCurrentlyActive = (!start || now >= start) && (!end || now <= end);
       const startsSoon = start && start > now && start <= soonThreshold;
       
-      return isCurrentlyActive || startsSoon;
+      const isActive = isCurrentlyActive || startsSoon;
+      
+      if (process.env.DEBUG_ALERTS === 'true' && !isActive) {
+        console.log(`[RealMTAService] Alert ${alert.id} filtered out by time: start=${start?.toISOString()}, end=${end?.toISOString()}, now=${now.toISOString()}`);
+      }
+      
+      return isActive;
     });
     
     if (process.env.DEBUG_ALERTS === 'true') {
@@ -1984,25 +1998,55 @@ export class RealMTAService {
     const allAlerts = await this.getActiveServiceAlerts();
     const timeWindowAlerts = await this.getRelevantAlertsForTimeWindow(4 * 60 * 60 * 1000); // 4 hour window
     
+    if (process.env.DEBUG_ALERTS === 'true') {
+      console.log(`[RealMTAService] getPrioritizedAlertsForCommute: lines=${lines.join(',')} direction=${direction}`);
+      console.log(`[RealMTAService] Total active alerts: ${allAlerts.length}`);
+      console.log(`[RealMTAService] Time window alerts: ${timeWindowAlerts.length}`);
+    }
+    
     // Filter by lines and direction
     const relevantAlerts = allAlerts.filter(alert => {
       // Must affect at least one of our lines
       const affectsLines = alert.affectedRoutes.some(route => lines.includes(route));
-      if (!affectsLines) return false;
+      if (!affectsLines) {
+        if (process.env.DEBUG_ALERTS === 'true' && alert.affectedRoutes.length > 0) {
+          console.log(`[RealMTAService] Alert ${alert.id} filtered out: doesn't affect lines ${lines.join(',')} (affects: ${alert.affectedRoutes.join(',')})`);
+        }
+        return false;
+      }
       
       // Station-skipping alerts bypass both time window and direction filtering
       if (this.isStationSkippingAlert(alert)) {
+        if (process.env.DEBUG_ALERTS === 'true') {
+          console.log(`[RealMTAService] Station-skipping alert ${alert.id} PASSED: "${alert.headerText}"`);
+        }
         return true;
       }
       
       // Regular alerts must be within time window and match direction
       const inTimeWindow = timeWindowAlerts.some(ta => ta.id === alert.id);
-      if (!inTimeWindow) return false;
+      if (!inTimeWindow) {
+        if (process.env.DEBUG_ALERTS === 'true') {
+          console.log(`[RealMTAService] Alert ${alert.id} filtered out: not in time window`);
+        }
+        return false;
+      }
       
       const directionMatch = alert.informedEntities.some(entity => {
         if (!entity.routeId || !lines.includes(entity.routeId)) return false;
         return entity.directionId === undefined || entity.directionId === direction;
       });
+      
+      if (!directionMatch) {
+        if (process.env.DEBUG_ALERTS === 'true') {
+          console.log(`[RealMTAService] Alert ${alert.id} filtered out: direction mismatch (want: ${direction}, has: ${alert.informedEntities.map(e => e.directionId).join(',')})`);
+        }
+        return false;
+      }
+      
+      if (process.env.DEBUG_ALERTS === 'true') {
+        console.log(`[RealMTAService] Regular alert ${alert.id} PASSED: "${alert.headerText}"`);
+      }
       
       return directionMatch;
     });
