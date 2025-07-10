@@ -6,6 +6,7 @@ import { RouteCard } from './RouteCard';
 import { getThemeStyles } from '../../design/components';
 import { colors } from '../../design/theme';
 import { useWebPullToRefresh } from '../../hooks/useWebPullToRefresh';
+import { ClockSyncService, TimeValidationResult } from '../../services/ClockSyncService';
 
 interface CommuteConfig {
   title: string;
@@ -18,6 +19,25 @@ interface CommuteConfig {
 
 interface CommuteAppBaseProps {
   config: CommuteConfig;
+}
+
+/**
+ * Format data freshness indicator
+ */
+function formatDataFreshness(lastUpdated: Date): string {
+  const now = new Date();
+  const secondsAgo = Math.floor((now.getTime() - lastUpdated.getTime()) / 1000);
+  
+  if (secondsAgo < 30) {
+    return 'Just updated';
+  } else if (secondsAgo < 60) {
+    return `${secondsAgo}s ago`;
+  } else if (secondsAgo < 120) {
+    return '1m ago';
+  } else {
+    const minutesAgo = Math.floor(secondsAgo / 60);
+    return `${minutesAgo}m ago`;
+  }
 }
 
 /**
@@ -145,6 +165,7 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
   const [expandedRoutes, setExpandedRoutes] = useState<Set<number>>(new Set());
   const [serviceAlerts, setServiceAlerts] = useState<ServiceAlert[]>([]);
   const [debugMessage, setDebugMessage] = useState<string>('');
+  const [clockValidation, setClockValidation] = useState<TimeValidationResult | null>(null);
   
   const mtaService = new RealMTAService();
 
@@ -155,14 +176,109 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
   useEffect(() => {
     loadRoutes();
     loadServiceAlerts();
+    validateClockAccuracy();
     
-    const interval = setInterval(() => {
-      loadRoutes();
-      loadServiceAlerts();
-    }, 30000); // Update every 30 seconds
+    // Use smart refresh intervals based on next departure proximity
+    const refreshInterval = setSmartRefreshInterval();
 
-    return () => clearInterval(interval);
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
   }, []);
+
+  const setSmartRefreshInterval = () => {
+    let currentInterval: NodeJS.Timeout | null = null;
+    
+    const scheduleNextRefresh = () => {
+      const refreshIntervalMs = calculateRefreshInterval();
+      
+      currentInterval = setTimeout(() => {
+        loadRoutes();
+        loadServiceAlerts();
+        scheduleNextRefresh(); // Schedule next refresh with updated interval
+      }, refreshIntervalMs);
+    };
+    
+    // Start the smart refresh cycle
+    scheduleNextRefresh();
+    
+    // Return cleanup function
+    return () => {
+      if (currentInterval) {
+        clearTimeout(currentInterval);
+      }
+    };
+  };
+
+  const calculateRefreshInterval = (): number => {
+    if (routes.length === 0) {
+      return 30000; // Default 30s when no routes
+    }
+    
+    // Find the next departure time
+    const now = new Date();
+    const nextDepartures = routes
+      .map(route => {
+        // Parse arrival time to find the earliest upcoming time
+        const arrivalTime = parseTime(route.arrivalTime);
+        return arrivalTime.getTime() - now.getTime();
+      })
+      .filter(diff => diff > 0) // Only future times
+      .sort((a, b) => a - b);
+    
+    if (nextDepartures.length === 0) {
+      return 30000; // Default 30s if no upcoming departures
+    }
+    
+    const nextDepartureMs = nextDepartures[0];
+    const nextDepartureMinutes = nextDepartureMs / (60 * 1000);
+    
+    // Adaptive refresh intervals based on proximity to next departure
+    if (nextDepartureMinutes <= 2) {
+      return 10000; // 10 seconds when train is very close
+    } else if (nextDepartureMinutes <= 5) {
+      return 15000; // 15 seconds when train is close
+    } else if (nextDepartureMinutes <= 10) {
+      return 20000; // 20 seconds when train is moderately close
+    } else {
+      return 30000; // 30 seconds for distant trains
+    }
+  };
+
+  // Helper function to parse time strings (reuse existing logic)
+  const parseTime = (timeStr: string): Date => {
+    const today = new Date();
+    const [time, period] = timeStr.split(' ');
+    const [hours, minutes] = time.split(':').map(Number);
+    
+    let hour24 = hours;
+    if (period === 'PM' && hours !== 12) hour24 += 12;
+    if (period === 'AM' && hours === 12) hour24 = 0;
+    
+    const targetDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour24, minutes);
+    
+    // If time is in the past, assume next day
+    if (targetDate.getTime() < Date.now()) {
+      targetDate.setDate(targetDate.getDate() + 1);
+    }
+    
+    return targetDate;
+  };
+
+  const validateClockAccuracy = async () => {
+    try {
+      const validation = await ClockSyncService.validateClockAccuracy();
+      setClockValidation(validation);
+      
+      if (!validation.isAccurate) {
+        console.warn('[CommuteAppBase] Clock drift detected:', validation.offsetSeconds, 'seconds');
+      }
+    } catch (error) {
+      console.warn('[CommuteAppBase] Clock validation failed:', error);
+    }
+  };
 
   const loadRoutes = async () => {
     try {
@@ -296,7 +412,7 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
               <Text style={[styles.indicator.text, styles.indicator.liveText, { fontSize: 10 }]}>LIVE</Text>
             </View>
             <Text style={{ fontSize: 10, color: styles.theme.colors.textSecondary }}>
-              {lastUpdated.toLocaleTimeString()}
+              {formatDataFreshness(lastUpdated)}
             </Text>
             
             {/* Debug message for web/PWA debugging */}
@@ -342,6 +458,27 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
         </View>
         
       </View>
+
+      {/* Clock Drift Warning */}
+      {clockValidation && !clockValidation.isAccurate && (
+        <View style={{
+          backgroundColor: styles.theme.colors.warning || '#FFA500',
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          marginHorizontal: 8,
+          marginBottom: 8,
+          borderRadius: 6
+        }}>
+          <Text style={{
+            color: '#FFFFFF',
+            fontSize: 12,
+            fontWeight: '500',
+            textAlign: 'center'
+          }}>
+            ⏰ {clockValidation.warningMessage}
+          </Text>
+        </View>
+      )}
 
       <ScrollView
         testID={config.title === 'Morning Commute' ? 'scroll-view' : 'afternoon-routes-container'}

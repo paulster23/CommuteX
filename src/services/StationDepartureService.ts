@@ -48,12 +48,13 @@ export class StationDepartureService {
         );
 
         // Convert to TrainDeparture objects and limit to 5
+        const dataFetchTime = new Date(); // Track when this data was fetched
         const departures = stopTimeUpdates
           .slice(0, 5) // Limit to next 5 trains per line
           .map(update => ({
             line,
             departureTime: new Date(update.departureTime! * 1000),
-            relativeTime: this.formatRelativeTime(new Date(update.departureTime! * 1000))
+            relativeTime: this.formatRelativeTime(new Date(update.departureTime! * 1000), dataFetchTime)
           }));
 
         departuresByLine[line] = departures;
@@ -87,12 +88,13 @@ export class StationDepartureService {
         );
 
         // Convert to TrainDeparture objects and limit to 5
+        const dataFetchTime = new Date(); // Track when this data was fetched
         const departures = stopTimeUpdates
           .slice(0, 5) // Limit to next 5 trains per line
           .map(update => ({
             line,
             departureTime: new Date(update.departureTime! * 1000),
-            relativeTime: this.formatRelativeTime(new Date(update.departureTime! * 1000))
+            relativeTime: this.formatRelativeTime(new Date(update.departureTime! * 1000), dataFetchTime)
           }));
 
         departuresByLine[line] = departures;
@@ -107,15 +109,48 @@ export class StationDepartureService {
     return departuresByLine;
   }
 
-  static formatRelativeTime(departureTime: Date): string {
+  static formatRelativeTime(departureTime: Date, dataFetchTime?: Date): string {
     const now = new Date();
-    const diffInMinutes = Math.round((departureTime.getTime() - now.getTime()) / 60000);
     
-    if (diffInMinutes <= 0) {
+    // Apply time drift compensation
+    const compensatedDepartureTime = this.applyTimeDriftCompensation(departureTime, dataFetchTime);
+    
+    const diffInSeconds = (compensatedDepartureTime.getTime() - now.getTime()) / 1000;
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    
+    if (diffInSeconds <= 30) {
       return 'Now';
     }
     
+    if (diffInSeconds <= 90) {
+      return '1';
+    }
+    
     return `${diffInMinutes}`;
+  }
+
+  /**
+   * Apply time drift compensation to account for data processing delays
+   */
+  private static applyTimeDriftCompensation(departureTime: Date, dataFetchTime?: Date): Date {
+    const PROCESSING_DELAY_SECONDS = 30; // Account for 30s average processing delay
+    const DATA_STALENESS_BUFFER = 15;    // Additional 15s buffer for data staleness
+    
+    const compensatedTime = new Date(departureTime.getTime());
+    
+    // If we know when data was fetched, account for elapsed time since fetch
+    if (dataFetchTime) {
+      const elapsedSinceFetch = (new Date().getTime() - dataFetchTime.getTime()) / 1000;
+      compensatedTime.setSeconds(compensatedTime.getSeconds() - elapsedSinceFetch);
+    }
+    
+    // Apply processing delay compensation
+    compensatedTime.setSeconds(compensatedTime.getSeconds() - PROCESSING_DELAY_SECONDS);
+    
+    // Apply additional staleness buffer for safety
+    compensatedTime.setSeconds(compensatedTime.getSeconds() - DATA_STALENESS_BUFFER);
+    
+    return compensatedTime;
   }
 
   /**

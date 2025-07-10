@@ -18,9 +18,9 @@ describe('CommuteApp', () => {
   test('shouldDisplayLastUpdatedTime', () => {
     render(<CommuteApp />);
     
-    // Time should be displayed in compact widget (just the time, no "Last updated:" prefix)
+    // Data freshness should be displayed in compact widget
     expect(screen.getByTestId('compact-status-widget')).toBeTruthy();
-    expect(screen.getByText(/\d{1,2}:\d{2}:\d{2}\s(AM|PM)/)).toBeTruthy();
+    expect(screen.getByText(/Just updated|\d+[sm] ago/)).toBeTruthy();
   });
 
   test('shouldDisplayLiveIndicator', () => {
