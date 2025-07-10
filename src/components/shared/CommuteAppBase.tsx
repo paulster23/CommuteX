@@ -5,6 +5,7 @@ import { RealMTAService, Route, ServiceAlert } from '../../services/RealMTAServi
 import { RouteCard } from './RouteCard';
 import { getThemeStyles } from '../../design/components';
 import { colors } from '../../design/theme';
+import { useWebPullToRefresh } from '../../hooks/useWebPullToRefresh';
 
 interface CommuteConfig {
   title: string;
@@ -147,6 +148,10 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
   
   const mtaService = new RealMTAService();
 
+  const setDebugMessageCallback = useCallback((message: string) => {
+    setDebugMessage(message);
+  }, []);
+
   useEffect(() => {
     loadRoutes();
     loadServiceAlerts();
@@ -215,26 +220,51 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
 
   const onRefresh = async () => {
     console.log('[CommuteAppBase] Pull-to-refresh triggered for', config.title);
+    console.log('[CommuteAppBase] Platform info:', {
+      OS: Platform.OS,
+      Version: Platform.Version,
+      isWeb: Platform.OS === 'web',
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A'
+    });
     
     setRefreshing(true);
     setDebugMessage('Refreshing data...');
+    console.log('[CommuteAppBase] Refresh state set to true');
+    
+    // Ensure minimum refresh duration for visual feedback
+    const startTime = Date.now();
+    const minRefreshDuration = 500; // 500ms minimum
     
     try {
+      console.log('[CommuteAppBase] Starting data refresh...');
       await Promise.all([
         loadRoutes(),
         loadServiceAlerts()
       ]);
+      console.log('[CommuteAppBase] Data refresh completed successfully');
       setDebugMessage('Refresh complete!');
     } catch (error) {
       console.error('[CommuteAppBase] Error during refresh:', error);
       setDebugMessage('Refresh failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      setRefreshing(false);
-      // Clear debug message after 2 seconds
-      setTimeout(() => setDebugMessage(''), 2000);
     }
+    
+    // Ensure minimum refresh duration
+    const elapsed = Date.now() - startTime;
+    if (elapsed < minRefreshDuration) {
+      await new Promise(resolve => setTimeout(resolve, minRefreshDuration - elapsed));
+    }
+    
+    console.log('[CommuteAppBase] Refresh completed, setting state to false');
+    setRefreshing(false);
+    // Clear debug message after 2 seconds
+    setTimeout(() => setDebugMessage(''), 2000);
   };
 
+  const { touchHandlers } = useWebPullToRefresh({
+    onRefresh,
+    threshold: 80,
+    onDebugMessage: setDebugMessageCallback
+  });
 
   const toggleRouteExpansion = (routeId: number) => {
     const newExpanded = new Set(expandedRoutes);
@@ -269,17 +299,25 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
               {lastUpdated.toLocaleTimeString()}
             </Text>
             
-            {/* Debug message */}
+            {/* Debug message for web/PWA debugging */}
             {debugMessage && (
               <Text style={{ fontSize: 10, color: styles.theme.colors.success, marginLeft: 8 }}>
                 {debugMessage}
               </Text>
             )}
             
-            {/* Manual refresh button for web debugging */}
+            {/* Manual refresh button for web/PWA debugging */}
             {Platform.OS === 'web' && (
               <TouchableOpacity
-                onPress={onRefresh}
+                onPress={async () => {
+                  console.log('[CommuteAppBase] Manual refresh button pressed');
+                  try {
+                    await onRefresh();
+                    console.log('[CommuteAppBase] Manual refresh completed successfully');
+                  } catch (error) {
+                    console.error('[CommuteAppBase] Manual refresh failed:', error);
+                  }
+                }}
                 disabled={refreshing}
                 style={{
                   marginLeft: 8,
@@ -310,15 +348,18 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
         style={{ flex: 1, paddingHorizontal: 8 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={styles.theme.colors.primary}
-            colors={[styles.theme.colors.primary]}
-            progressBackgroundColor={styles.theme.colors.surface}
-            progressViewOffset={0}
-          />
+          Platform.OS !== 'web' ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={styles.theme.colors.primary}
+              colors={[styles.theme.colors.primary]}
+              progressBackgroundColor={styles.theme.colors.surface}
+              progressViewOffset={0}
+            />
+          ) : undefined
         }
+        {...touchHandlers}
       >
 
         {/* Routes */}
