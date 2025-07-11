@@ -170,6 +170,32 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
   
   const mtaService = new RealMTAService();
 
+  // Filter alerts to only show warning and severe, and only currently active alerts
+  const filteredServiceAlerts = serviceAlerts.filter(alert => {
+    // Only show warning and severe alerts
+    if (alert.severity === 'info') {
+      return false;
+    }
+    
+    // Only show currently active alerts
+    if (alert.activePeriod) {
+      const now = new Date();
+      const { start, end } = alert.activePeriod;
+      
+      // If alert has start time and it's in the future, don't show
+      if (start && start.getTime() > now.getTime()) {
+        return false;
+      }
+      
+      // If alert has end time and it's in the past, don't show
+      if (end && end.getTime() < now.getTime()) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+
 
   const setDebugMessageCallback = useCallback((message: string) => {
     setDebugMessage(message);
@@ -557,12 +583,12 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
             <Text style={{ color: styles.theme.colors.text, fontSize: 18, fontWeight: '600', marginBottom: 8 }}>
               Service Alerts
             </Text>
-            {serviceAlerts.length === 0 ? (
+            {filteredServiceAlerts.length === 0 ? (
               <Text style={{ color: styles.theme.colors.textSecondary, fontSize: 14 }}>
                 No active service alerts for this route
               </Text>
             ) : (
-              serviceAlerts.map((alert) => (
+              filteredServiceAlerts.map((alert) => (
                 <CriticalAlertPill
                   key={alert.id}
                   alert={alert}

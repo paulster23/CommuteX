@@ -5,10 +5,12 @@ import { MapPin, Navigation, Clock, AlertCircle, Train, Zap } from 'lucide-react
 import { GPSLocationProvider, Location } from '../services/LocationService';
 import { NearestStationService, NearestStationResult, ConsolidatedStationResult } from '../services/NearestStationService';
 import { StationDepartureService, DeparturesByLine } from '../services/StationDepartureService';
+import { RealMTAService, ServiceAlert } from '../services/RealMTAService';
 import { getThemeStyles } from '../design/components';
 import { useColorScheme } from 'react-native';
 import { TransferRouteIcon } from '../components/TransferRouteIcon';
 import { TrainTimePill } from '../components/TrainTimePill';
+import { CriticalAlertPill } from '../components/shared/CriticalAlertPill';
 
 interface LocationState {
   location: Location | null;
@@ -19,6 +21,12 @@ interface LocationState {
 
 interface DepartureState {
   departures: DeparturesByLine | null;
+  loading: boolean;
+  error: string | null;
+}
+
+interface AlertState {
+  alerts: ServiceAlert[];
   loading: boolean;
   error: string | null;
 }
@@ -49,6 +57,12 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
     error: null
   });
 
+  const [alertState, setAlertState] = useState<AlertState>({
+    alerts: [],
+    loading: false,
+    error: null
+  });
+
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -59,7 +73,8 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
     threshold: 80 // pixels to trigger refresh
   });
 
-  const gpsProvider = locationProvider || new GPSLocationProvider();
+  const gpsProvider = useRef(locationProvider || new GPSLocationProvider()).current;
+  const mtaService = useRef(new RealMTAService()).current;
 
   const fetchDepartures = useCallback(async (station: ConsolidatedStationResult, direction: 'northbound' | 'southbound', silent = false) => {
     if (!silent) {
@@ -75,6 +90,39 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
       });
       // Mark that we've successfully loaded departures at least once
       hasInitiallyLoaded.current = true;
+      
+      // Check if we have any departures, if not, fetch alerts for this station
+      const hasAnyDepartures = departures && Object.keys(departures).length > 0 && 
+        Object.values(departures).some(lineDeparts => lineDeparts.length > 0);
+      
+      if (!hasAnyDepartures) {
+        // Fetch alerts inline to avoid callback dependency issues
+        setAlertState(prev => ({ ...prev, loading: true, error: null }));
+        try {
+          const stationLines = station.lines;
+          const directionId = direction === 'northbound' ? 1 : 0;
+          const allAlerts = await mtaService.getServiceAlertsForCommute(stationLines, directionId);
+          
+          const relevantAlerts = allAlerts.filter(alert => {
+            if (alert.severity === 'info') return false;
+            if (alert.activePeriod) {
+              const now = new Date();
+              const { start, end } = alert.activePeriod;
+              if (start && start.getTime() > now.getTime()) return false;
+              if (end && end.getTime() < now.getTime()) return false;
+            }
+            return true;
+          });
+
+          setAlertState({ alerts: relevantAlerts, loading: false, error: null });
+        } catch (error) {
+          console.error('Failed to fetch station alerts:', error);
+          setAlertState({ alerts: [], loading: false, error: 'Unable to fetch service alerts' });
+        }
+      } else {
+        // Clear alerts if we have departures
+        setAlertState({ alerts: [], loading: false, error: null });
+      }
     } catch (error) {
       console.error('Failed to fetch departures:', error);
       setDepartureState({
@@ -84,6 +132,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
       });
     }
   }, []);
+
 
   const fetchLocation = useCallback(async () => {
     setLocationState(prev => ({ ...prev, loading: true, error: null }));
@@ -103,7 +152,47 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
 
       // Fetch departures for the nearest station
       if (nearestStation) {
-        await fetchDepartures(nearestStation, direction);
+        // Inline departures fetching to avoid dependency issues
+        setDepartureState(prev => ({ ...prev, loading: true, error: null }));
+        try {
+          const departures = await StationDepartureService.getDeparturesForConsolidatedStation(nearestStation, direction);
+          setDepartureState({ departures, loading: false, error: null });
+          hasInitiallyLoaded.current = true;
+          
+          // Check for alerts if no departures
+          const hasAnyDepartures = departures && Object.keys(departures).length > 0 && 
+            Object.values(departures).some(lineDeparts => lineDeparts.length > 0);
+          
+          if (!hasAnyDepartures) {
+            setAlertState(prev => ({ ...prev, loading: true, error: null }));
+            try {
+              const stationLines = nearestStation.lines;
+              const directionId = direction === 'northbound' ? 1 : 0;
+              const allAlerts = await mtaService.getServiceAlertsForCommute(stationLines, directionId);
+              
+              const relevantAlerts = allAlerts.filter(alert => {
+                if (alert.severity === 'info') return false;
+                if (alert.activePeriod) {
+                  const now = new Date();
+                  const { start, end } = alert.activePeriod;
+                  if (start && start.getTime() > now.getTime()) return false;
+                  if (end && end.getTime() < now.getTime()) return false;
+                }
+                return true;
+              });
+
+              setAlertState({ alerts: relevantAlerts, loading: false, error: null });
+            } catch (error) {
+              console.error('Failed to fetch station alerts:', error);
+              setAlertState({ alerts: [], loading: false, error: 'Unable to fetch service alerts' });
+            }
+          } else {
+            setAlertState({ alerts: [], loading: false, error: null });
+          }
+        } catch (error) {
+          console.error('Failed to fetch departures:', error);
+          setDepartureState({ departures: null, loading: false, error: 'Unable to fetch train departures' });
+        }
       }
     } catch (error) {
       let errorMessage = 'Unable to get your current location. Please try again.';
@@ -123,7 +212,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
         error: errorMessage
       });
     }
-  }, [direction, fetchDepartures]);
+  }, [direction]);
 
   const onRefresh = useCallback(async () => {
     console.log('[HelpScreen] Pull-to-refresh triggered');
@@ -274,17 +363,64 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
     if (locationState.nearestStation && !locationState.loading) {
       // Use silent mode for direction changes to prevent UI flashing
       const isDirectionChange = hasInitiallyLoaded.current;
+      
+      const fetchDeparturesForDirection = async (silent: boolean = false) => {
+        if (!silent) {
+          setDepartureState(prev => ({ ...prev, loading: true, error: null }));
+        }
+
+        try {
+          const departures = await StationDepartureService.getDeparturesForConsolidatedStation(locationState.nearestStation!, direction);
+          setDepartureState({ departures, loading: false, error: null });
+          hasInitiallyLoaded.current = true;
+          
+          // Check for alerts if no departures
+          const hasAnyDepartures = departures && Object.keys(departures).length > 0 && 
+            Object.values(departures).some(lineDeparts => lineDeparts.length > 0);
+          
+          if (!hasAnyDepartures) {
+            setAlertState(prev => ({ ...prev, loading: true, error: null }));
+            try {
+              const stationLines = locationState.nearestStation!.lines;
+              const directionId = direction === 'northbound' ? 1 : 0;
+              const allAlerts = await mtaService.getServiceAlertsForCommute(stationLines, directionId);
+              
+              const relevantAlerts = allAlerts.filter(alert => {
+                if (alert.severity === 'info') return false;
+                if (alert.activePeriod) {
+                  const now = new Date();
+                  const { start, end } = alert.activePeriod;
+                  if (start && start.getTime() > now.getTime()) return false;
+                  if (end && end.getTime() < now.getTime()) return false;
+                }
+                return true;
+              });
+
+              setAlertState({ alerts: relevantAlerts, loading: false, error: null });
+            } catch (error) {
+              console.error('Failed to fetch station alerts:', error);
+              setAlertState({ alerts: [], loading: false, error: 'Unable to fetch service alerts' });
+            }
+          } else {
+            setAlertState({ alerts: [], loading: false, error: null });
+          }
+        } catch (error) {
+          console.error('Failed to fetch departures:', error);
+          setDepartureState({ departures: null, loading: false, error: 'Unable to fetch train departures' });
+        }
+      };
+
       if (isDirectionChange) {
         setDirectionChanging(true);
-        fetchDepartures(locationState.nearestStation, direction, true).finally(() => {
+        fetchDeparturesForDirection(true).finally(() => {
           setDirectionChanging(false);
         });
       } else {
         // Initial load - use normal mode
-        fetchDepartures(locationState.nearestStation, direction);
+        fetchDeparturesForDirection(false);
       }
     }
-  }, [direction, locationState.nearestStation, locationState.loading, fetchDepartures]);
+  }, [direction, locationState.nearestStation, locationState.loading]);
 
   const handleDirectionChange = (newDirection: 'northbound' | 'southbound') => {
     setDirection(newDirection);
@@ -296,6 +432,11 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
 
   const formatDistance = (distance: number): string => {
     return `${distance.toFixed(2)} miles away`;
+  };
+
+  const hasAnyDepartures = (departures: DeparturesByLine | null): boolean => {
+    return departures && Object.keys(departures).length > 0 && 
+      Object.values(departures).some(lineDeparts => lineDeparts.length > 0);
   };
 
   const getErrorTitle = (error: string): string => {
@@ -417,7 +558,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
 
 
         {/* Next Departures */}
-        {locationState.nearestStation && departureState.departures && (
+        {locationState.nearestStation && departureState.departures && hasAnyDepartures(departureState.departures) && (
           <View style={[styles.routeCard.container, screenStyles.card, { opacity: directionChanging ? 0.7 : 1.0 }]}>
             <View style={styles.routeCard.header}>
               <View style={styles.routeCard.mainInfo}>
@@ -453,6 +594,54 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                 </View>
               </View>
             ))}
+          </View>
+        )}
+
+        {/* No Departures State */}
+        {locationState.nearestStation && departureState.departures && !hasAnyDepartures(departureState.departures) && (
+          <View style={[styles.routeCard.container, screenStyles.card]}>
+            <View style={styles.routeCard.header}>
+              <View style={styles.routeCard.mainInfo}>
+                <View style={[styles.routeCard.iconContainer, { backgroundColor: styles.theme.colors.warning || '#F59E0B' }]}>
+                  <AlertCircle size={20} color="#FFFFFF" />
+                </View>
+                <View style={styles.routeCard.textInfo}>
+                  <Text style={styles.routeCard.title}>{locationState.nearestStation.name}</Text>
+                  <Text style={styles.routeCard.subtitle}>
+                    {formatDistance(locationState.nearestStation.distance)} • {direction === 'northbound' ? 'North' : 'South'} trains
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* No Departures Message */}
+            <View style={[screenStyles.lineRow, { borderTopColor: styles.theme.colors.border }]}>
+              <Text style={[styles.routeCard.title, { color: styles.theme.colors.textSecondary, textAlign: 'center', flex: 1 }]}>
+                No current departures
+              </Text>
+            </View>
+
+            {/* Service Alerts for this station */}
+            {alertState.alerts.length > 0 && (
+              <View style={{ paddingHorizontal: 8, paddingBottom: 12 }}>
+                <Text style={{ 
+                  color: styles.theme.colors.text, 
+                  fontSize: 16, 
+                  fontWeight: '600', 
+                  marginBottom: 8,
+                  paddingHorizontal: 8
+                }}>
+                  Service Alerts
+                </Text>
+                {alertState.alerts.map((alert) => (
+                  <CriticalAlertPill
+                    key={alert.id}
+                    alert={alert}
+                    isDarkMode={isDarkMode}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         )}
 

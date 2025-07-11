@@ -4,6 +4,119 @@ import { ServiceAlert } from '../../services/RealMTAService';
 import { getThemeStyles } from '../../design/components';
 import { colors } from '../../design/theme';
 
+/**
+ * Format service alert active period for display
+ */
+function formatAlertTimePeriod(activePeriod?: { start?: Date; end?: Date }): string {
+  if (!activePeriod) {
+    return ''; // No timing information available
+  }
+
+  const now = new Date();
+  const { start, end } = activePeriod;
+
+  // Format time for display (e.g., "2:30 PM")
+  const formatTime = (date: Date) => {
+    try {
+      if (!date || isNaN(date.getTime())) {
+        return 'Invalid Time';
+      }
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      console.warn('[CriticalAlertPill] Error formatting time:', date, error);
+      return 'Invalid Time';
+    }
+  };
+
+  // Format date for display (e.g., "Dec 25")
+  const formatDate = (date: Date) => {
+    try {
+      if (!date || isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.warn('[CriticalAlertPill] Error formatting date:', date, error);
+      return 'Invalid Date';
+    }
+  };
+
+  // Check if date is today
+  const isToday = (date: Date) => {
+    try {
+      if (!date || isNaN(date.getTime())) return false;
+      const today = new Date();
+      return date.getDate() === today.getDate() &&
+             date.getMonth() === today.getMonth() &&
+             date.getFullYear() === today.getFullYear();
+    } catch (error) {
+      return false;
+    }
+  };
+
+  // Check if date is tomorrow
+  const isTomorrow = (date: Date) => {
+    try {
+      if (!date || isNaN(date.getTime())) return false;
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return date.getDate() === tomorrow.getDate() &&
+             date.getMonth() === tomorrow.getMonth() &&
+             date.getFullYear() === tomorrow.getFullYear();
+    } catch (error) {
+      return false;
+    }
+  };
+
+  // Validate dates before processing
+  const isValidDate = (date: Date | undefined) => {
+    return date && !isNaN(date.getTime());
+  };
+
+  // Build time period string
+  if (isValidDate(start) && isValidDate(end)) {
+    // Both start and end times
+    if (isToday(start!) && isToday(end!)) {
+      return `Today ${formatTime(start!)} - ${formatTime(end!)}`;
+    } else if (isToday(start!) && isTomorrow(end!)) {
+      return `Today ${formatTime(start!)} - Tomorrow ${formatTime(end!)}`;
+    } else if (start!.getDate() === end!.getDate() && start!.getMonth() === end!.getMonth() && start!.getFullYear() === end!.getFullYear()) {
+      // Same day but not today
+      return `${formatDate(start!)} ${formatTime(start!)} - ${formatTime(end!)}`;
+    } else {
+      // Different days
+      return `${formatDate(start!)} ${formatTime(start!)} - ${formatDate(end!)} ${formatTime(end!)}`;
+    }
+  } else if (isValidDate(start)) {
+    // Only start time
+    if (isToday(start!)) {
+      return `Starting today at ${formatTime(start!)}`;
+    } else if (isTomorrow(start!)) {
+      return `Starting tomorrow at ${formatTime(start!)}`;
+    } else {
+      return `Starting ${formatDate(start!)} at ${formatTime(start!)}`;
+    }
+  } else if (isValidDate(end)) {
+    // Only end time
+    if (isToday(end!)) {
+      return `Until today at ${formatTime(end!)}`;
+    } else if (isTomorrow(end!)) {
+      return `Until tomorrow at ${formatTime(end!)}`;
+    } else {
+      return `Until ${formatDate(end!)} at ${formatTime(end!)}`;
+    }
+  }
+
+  return '';
+}
+
 interface CriticalAlertPillProps {
   alert: ServiceAlert;
   isDarkMode: boolean;
@@ -17,6 +130,32 @@ export function CriticalAlertPill({ alert, isDarkMode }: CriticalAlertPillProps)
     // Use the first affected route's color, or default if none
     const primaryRoute = alert.affectedRoutes[0];
     return colors.subway[primaryRoute as keyof typeof colors.subway] || '#6B7280';
+  };
+
+  const getSeverityLabel = (severity: string) => {
+    switch (severity) {
+      case 'severe':
+        return 'SEVERE';
+      case 'warning':
+        return 'WARNING';
+      case 'info':
+        return 'INFO';
+      default:
+        return severity.toUpperCase();
+    }
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'severe':
+        return '#DC2626'; // Red
+      case 'warning':
+        return '#F59E0B'; // Orange
+      case 'info':
+        return '#3B82F6'; // Blue
+      default:
+        return '#6B7280'; // Gray
+    }
   };
 
   const toggleExpansion = () => {
@@ -68,6 +207,23 @@ export function CriticalAlertPill({ alert, isDarkMode }: CriticalAlertPillProps)
             ))}
           </View>
           
+          {/* Severity Badge */}
+          <View style={{
+            backgroundColor: getSeverityColor(alert.severity),
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            borderRadius: 4,
+            marginRight: 8,
+          }}>
+            <Text style={{
+              color: '#FFFFFF',
+              fontSize: 9,
+              fontWeight: '700',
+            }}>
+              {getSeverityLabel(alert.severity)}
+            </Text>
+          </View>
+          
           {/* Alert Header Text */}
           <Text 
             style={{ 
@@ -106,6 +262,31 @@ export function CriticalAlertPill({ alert, isDarkMode }: CriticalAlertPillProps)
           }}>
             {alert.descriptionText}
           </Text>
+          
+          {/* Time in Effect */}
+          {(() => {
+            const timePeriod = formatAlertTimePeriod(alert.activePeriod);
+            return timePeriod ? (
+              <View style={{ marginBottom: 8 }}>
+                <Text style={{ 
+                  color: '#FFFFFF', 
+                  fontSize: 12, 
+                  opacity: 0.8,
+                  marginBottom: 2
+                }}>
+                  Time in Effect:
+                </Text>
+                <Text style={{ 
+                  color: '#FFFFFF', 
+                  fontSize: 12, 
+                  opacity: 0.9,
+                  fontWeight: '500'
+                }}>
+                  {timePeriod}
+                </Text>
+              </View>
+            ) : null;
+          })()}
           
           {/* Direction Indicators */}
           {alert.informedEntities.length > 0 && (
