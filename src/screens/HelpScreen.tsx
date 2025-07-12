@@ -640,7 +640,6 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                       line={line}
                       time={departure.relativeTime}
                       index={index}
-                      feedSource={departure.feedSource}
                     />
                   ))}
                 </View>

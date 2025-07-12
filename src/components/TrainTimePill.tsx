@@ -36,10 +36,9 @@ interface TrainTimePillProps {
   line: string;
   time: string;
   index: number;
-  feedSource?: string;
 }
 
-export function TrainTimePill({ line, time, index, feedSource }: TrainTimePillProps) {
+export function TrainTimePill({ line, time, index }: TrainTimePillProps) {
   const lineColors = getLineColors(line);
   
   return (
@@ -48,34 +47,23 @@ export function TrainTimePill({ line, time, index, feedSource }: TrainTimePillPr
       style={[styles.pill, { backgroundColor: lineColors.backgroundColor }]}
     >
       <Text style={[styles.pillText, { color: lineColors.color }]}>{time}</Text>
-      {feedSource && (
-        <Text style={[styles.feedSourceText, { color: lineColors.color }]}>
-          {feedSource}
-        </Text>
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   pill: {
-    paddingHorizontal: 10, // Reduced from 12 for wider pills
-    paddingVertical: 4, // Reduced from 6 for compact density
-    borderRadius: 12, // Reduced from 16 for compact appearance
-    marginRight: 6, // Reduced from 8 for wider pills
+    paddingHorizontal: 12, // Increased for larger text
+    paddingVertical: 8, // Increased for larger text
+    borderRadius: 16, // Increased for larger appearance
+    marginRight: 8, // Increased spacing
     marginBottom: 4,
-    width: 40, // Fixed width to prevent layout jumping
+    width: 80, // Doubled width for larger text
     alignItems: 'center',
     justifyContent: 'center',
   },
   pillText: {
-    fontSize: 12, // Reduced from 14 for iPhone 13 mini
+    fontSize: 24, // Doubled from 12 for better accessibility
     fontWeight: '600',
-  },
-  feedSourceText: {
-    fontSize: 7,
-    fontWeight: '400',
-    opacity: 0.8,
-    marginTop: 1,
   },
 });
