@@ -2,6 +2,7 @@ import { StaticLocationProvider, LocationProvider } from './LocationService';
 import { StationMappingService } from './StationMappingService';
 import { CacheManager } from './CacheManager';
 import { StationDatabase } from './StationDatabase';
+import { getAlertsFeedUrls, getFeedUrlForLine, getMTAApiHeaders } from '../config/MTAFeedConfig';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 
 export type DataSourceType = 'realtime' | 'estimate' | 'fixed';
@@ -75,6 +76,7 @@ export interface ServiceAlert {
     start?: Date;
     end?: Date;
   };
+  feedSource?: string; // Which feed this alert came from
 }
 
 export interface Route {
@@ -118,11 +120,9 @@ export class RealMTAService {
   private readonly cacheManager: CacheManager;
   private readonly stationMapping: StationMappingService;
   
-  // GTFS-RT feed URLs
-  private readonly F_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm';
-  private readonly ACE_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace';
-  private readonly ALERTS_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts';
-  private readonly ALERTS_FEED_URL_FALLBACK = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-alerts';
+  // GTFS-RT feed URLs - using centralized configuration
+  private readonly F_TRAIN_FEED_URL = getFeedUrlForLine('F');
+  private readonly ACE_TRAIN_FEED_URL = getFeedUrlForLine('A');
   
   // Dynamic station ID getters using StationDatabase
   // Updated to use correct station IDs from the new comprehensive 472-station database
@@ -293,7 +293,8 @@ export class RealMTAService {
       const urlWithCacheBuster = `${feedUrl}?_=${cacheBuster}`;
       
       const response = await fetch(urlWithCacheBuster, {
-        cache: 'no-cache'
+        cache: 'no-cache',
+        headers: getMTAApiHeaders()
       });
       
       if (!response.ok) {
@@ -1447,23 +1448,26 @@ export class RealMTAService {
 
   /**
    * Fetch service alerts from MTA GTFS-RT alerts feed with fallback URL
+   * Updated to use centralized feed configuration with API key support
    */
   async getServiceAlerts(): Promise<ServiceAlert[]> {
-    // Try primary URL first, then fallback URL
-    const urlsToTry = [this.ALERTS_FEED_URL, this.ALERTS_FEED_URL_FALLBACK];
+    // Get alert feed URLs in priority order (nyct primary, camsys fallback)
+    const alertFeeds = getAlertsFeedUrls();
     
-    for (let i = 0; i < urlsToTry.length; i++) {
-      const url = urlsToTry[i];
-      const isLastUrl = i === urlsToTry.length - 1;
+    for (let i = 0; i < alertFeeds.length; i++) {
+      const feed = alertFeeds[i];
+      const isLastUrl = i === alertFeeds.length - 1;
       
       try {
-        console.log(`[RealMTAService] Fetching alerts from ${i === 0 ? 'primary' : 'fallback'} URL`);
+        console.log(`[RealMTAService] Fetching alerts from ${feed.description}`);
         
-        // MTA feeds are public and don't require API key
-        const response = await fetch(url);
+        // Use centralized headers with API key support
+        const response = await fetch(feed.url, {
+          headers: getMTAApiHeaders()
+        });
 
         if (!response.ok) {
-          console.error(`[RealMTAService] Failed to fetch alerts from ${url}:`, response.status);
+          console.error(`[RealMTAService] Failed to fetch alerts from ${feed.description}:`, response.status);
           if (isLastUrl) return [];
           continue; // Try next URL
         }
@@ -1475,17 +1479,29 @@ export class RealMTAService {
         const startsWithXml = firstBytes[0] === 0x3C && firstBytes[1] === 0x3F; // "<?xml"
         
         if (startsWithXml) {
-          const errorText = new TextDecoder().decode(alertsBuffer.slice(0, 200));
-          console.error(`[RealMTAService] Received XML error response from ${url}:`, errorText);
+          const errorText = new TextDecoder().decode(alertsBuffer.slice(0, 1000));
+          
+          // Enhanced error logging for specific error types
+          if (errorText.includes('NoSuchKey')) {
+            const keyMatch = errorText.match(/<Key>(.*?)<\/Key>/);
+            const key = keyMatch ? keyMatch[1] : 'unknown';
+            console.error(`[RealMTAService] NoSuchKey error from ${feed.description}: Feed key "${key}" does not exist.`);
+            console.error(`[RealMTAService] The MTA may have changed their feed structure.`);
+            console.error(`[RealMTAService] Attempted URL: ${feed.url}`);
+            console.error(`[RealMTAService] Consider checking MTA developer documentation for updated feed URLs.`);
+          } else {
+            console.error(`[RealMTAService] Received XML error response from ${feed.description}:`, errorText);
+          }
+          
           if (isLastUrl) return [];
           continue; // Try next URL
         }
         
         // Parse GTFS-RT alerts data using protobuf parsing
-        return await this.parseAlertsBuffer(alertsBuffer);
+        return await this.parseAlertsBuffer(alertsBuffer, feed.description);
         
       } catch (error) {
-        console.error(`[RealMTAService] Error fetching service alerts from ${url}:`, error);
+        console.error(`[RealMTAService] Error fetching service alerts from ${feed.description}:`, error);
         if (isLastUrl) return [];
         // Try next URL
       }
@@ -1497,7 +1513,7 @@ export class RealMTAService {
   /**
    * Parse GTFS-RT alerts protobuf buffer and extract service alerts
    */
-  async parseAlertsBuffer(alertsBuffer: ArrayBuffer): Promise<ServiceAlert[]> {
+  async parseAlertsBuffer(alertsBuffer: ArrayBuffer, feedSource?: string): Promise<ServiceAlert[]> {
     console.log(`[RealMTAService] Parsing GTFS-RT alerts protobuf data`);
     console.log(`[RealMTAService] Buffer size: ${alertsBuffer.byteLength} bytes`);
     
@@ -1607,10 +1623,6 @@ export class RealMTAService {
             end: parseGtfsTimestamp(period.end),
           };
           
-          // Debug log for timing issues
-          if (process.env.DEBUG_ALERTS === 'true' && activePeriod.start) {
-            console.log(`[RealMTAService] Alert timing: ${activePeriod.start.toISOString()} - ${activePeriod.end?.toISOString() || 'ongoing'}`);
-          }
         }
 
         alerts.push({
@@ -1620,15 +1632,13 @@ export class RealMTAService {
           affectedRoutes,
           severity,
           informedEntities,
-          activePeriod
+          activePeriod,
+          feedSource
         });
       }
       
       console.log(`[RealMTAService] Parsed ${alerts.length} service alerts`);
       
-      if (process.env.DEBUG_ALERTS === 'true') {
-        console.log(`[RealMTAService] Alert source: GTFS-RT feed (${alerts.length} alerts loaded)`);
-      }
       
       return alerts;
       
@@ -1695,56 +1705,105 @@ export class RealMTAService {
   }
 
   /**
+   * Check if an alert is about station skipping
+   */
+  private isSkippingAlert(alert: ServiceAlert): boolean {
+    const text = `${alert.headerText} ${alert.descriptionText}`.toLowerCase();
+    return text.includes('skip') || text.includes('not stopping');
+  }
+
+  /**
+   * Check if an alert is currently active
+   */
+  private isAlertCurrentlyActive(alert: ServiceAlert): boolean {
+    if (!alert.activePeriod) {
+      return true; // No time restriction means it's active
+    }
+    
+    const now = new Date();
+    const { start, end } = alert.activePeriod;
+    
+    // Check if current time is within the active period
+    if (start && now < start) {
+      return false; // Not started yet
+    }
+    
+    if (end && now > end) {
+      return false; // Already ended
+    }
+    
+    return true;
+  }
+
+  /**
    * Get service alerts for specific commute route
-   * Filters by lines, direction, and stations on the route
-   * Uses enhanced time-based filtering that includes station-skipping alerts
+   * Simple filtering by lines, direction, and current active status
    */
   async getServiceAlertsForCommute(
     lines: string[], 
     direction: 0 | 1, 
     stationIds: string[] = []
   ): Promise<ServiceAlert[]> {
-    if (process.env.DEBUG_ALERTS === 'true' || process.env.NODE_ENV === 'development') {
-      console.log(`[RealMTAService] Alert filtering step: lines=${lines.join(',')} direction=${direction} stations=${stationIds.join(',')}`);
-    }
+    const allAlerts = await this.getActiveServiceAlerts();
     
-    // Use the prioritized alert method which handles station-skipping alerts properly
-    const prioritizedAlerts = await this.getPrioritizedAlertsForCommute(lines, direction);
-    
-    // If no station filtering is requested, return all prioritized alerts
-    if (stationIds.length === 0) {
-      if (process.env.DEBUG_ALERTS === 'true') {
-        console.log(`[RealMTAService] Alert statistics: ${prioritizedAlerts.length} total alerts (no station filtering)`);
-      }
-      return prioritizedAlerts;
-    }
-    
-    // Apply station filtering only to non-station-skipping alerts
-    const filteredAlerts = prioritizedAlerts.filter(alert => {
-      // Station-skipping alerts always pass (they're critical)
-      if (this.isStationSkippingAlert(alert)) {
-        return true;
+    // Filter alerts that are currently active and affect our lines
+    const relevantAlerts = allAlerts.filter(alert => {
+      // Must be currently active
+      if (!this.isAlertCurrentlyActive(alert)) {
+        return false;
       }
       
-      // Check if alert affects any of our stations
-      const stationMatch = alert.informedEntities.some(entity => 
-        entity.stopId && stationIds.some(stationId => 
-          entity.stopId === stationId || 
-          entity.stopId === `${stationId}N` || 
-          entity.stopId === `${stationId}S`
-        )
-      );
+      // Must affect at least one of our lines
+      const affectsLines = alert.affectedRoutes.some(route => lines.includes(route));
+      if (!affectsLines) {
+        return false;
+      }
       
-      // Include alert if it has no station filter or affects our stations
-      const hasNoStationFilter = alert.informedEntities.every(entity => !entity.stopId);
-      return stationMatch || hasNoStationFilter;
+      // Must match direction (if specified in alert)
+      const directionMatch = alert.informedEntities.some(entity => {
+        if (!entity.routeId || !lines.includes(entity.routeId)) return false;
+        return entity.directionId === undefined || entity.directionId === direction;
+      });
+      
+      if (!directionMatch) {
+        return false;
+      }
+      
+      // Special handling for skipping alerts that affect your key stations
+      if (this.isSkippingAlert(alert)) {
+        // Check if the skipping alert mentions any of your key stations
+        const alertText = `${alert.headerText} ${alert.descriptionText}`.toLowerCase();
+        const keyStationNames = ['carroll st', 'carroll', 'jay st', '23rd st'];
+        const mentionsKeyStation = keyStationNames.some(station => alertText.includes(station));
+        
+        if (mentionsKeyStation) {
+          return true; // Always show skipping alerts affecting your stations
+        }
+      }
+      
+      // If station filtering is requested, check station match
+      if (stationIds.length > 0) {
+        const stationMatch = alert.informedEntities.some(entity => 
+          entity.stopId && stationIds.some(stationId => 
+            entity.stopId === stationId || 
+            entity.stopId === `${stationId}N` || 
+            entity.stopId === `${stationId}S`
+          )
+        );
+        
+        // Include alert if it has no station filter or affects our stations
+        const hasNoStationFilter = alert.informedEntities.every(entity => !entity.stopId);
+        return stationMatch || hasNoStationFilter;
+      }
+      
+      return true;
     });
     
-    if (process.env.DEBUG_ALERTS === 'true') {
-      console.log(`[RealMTAService] Alert statistics: ${prioritizedAlerts.length} total → ${filteredAlerts.length} filtered for stations`);
-    }
-    
-    return filteredAlerts;
+    // Sort by severity (severe first)
+    return relevantAlerts.sort((a, b) => {
+      const severityOrder = { 'severe': 0, 'warning': 1, 'info': 2 };
+      return severityOrder[a.severity] - severityOrder[b.severity];
+    });
   }
 
   /**
@@ -1797,29 +1856,14 @@ export class RealMTAService {
         // Check if this alert affects user's route stations
         const affectsUserRoute = await this.isUserRouteAffected(alert, direction);
         
-        // Get escalated severity based on alert content (e.g., station-skipping)
-        const escalatedSeverity = this.getEscalatedSeverityForAlert(alert);
-        
         if (affectsUserRoute) {
           userRouteAlerts.push(alert);
-          // Escalate severity when user's route stations are affected
-          if (alert.severity === 'info' || alert.severity === 'warning') {
-            // User route impact escalates any alert to severe
-            highestSeverity = 'severe';
-          } else {
-            highestSeverity = escalatedSeverity;
-          }
-        } else {
-          // Non-user route alerts use escalated severity
-          if (!highestSeverity || this.compareSeverity(escalatedSeverity, highestSeverity) > 0) {
-            highestSeverity = escalatedSeverity;
-          }
         }
-      }
-      
-      // If we have user route alerts, use the escalated severity
-      if (userRouteAlerts.length > 0 && highestSeverity !== 'severe') {
-        highestSeverity = 'severe';
+        
+        // Use original severity, no escalation
+        if (!highestSeverity || this.compareSeverity(alert.severity, highestSeverity) > 0) {
+          highestSeverity = alert.severity;
+        }
       }
     }
     
@@ -1883,14 +1927,6 @@ export class RealMTAService {
     const soonThreshold = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes from now
     
     const activeAlerts = allAlerts.filter(alert => {
-      // Station-skipping alerts bypass time filtering (they're always critical)
-      if (this.isStationSkippingAlert(alert)) {
-        if (process.env.DEBUG_ALERTS === 'true') {
-          console.log(`[RealMTAService] Station-skipping alert ${alert.id} bypassed time filtering: "${alert.headerText}"`);
-        }
-        return true;
-      }
-      
       // If no activePeriod is specified, treat as always active
       if (!alert.activePeriod) {
         return true;
@@ -1898,181 +1934,19 @@ export class RealMTAService {
       
       const { start, end } = alert.activePeriod;
       
-      // Alert is active if:
-      // 1. Currently active (between start and end)
-      // 2. Starts soon (within next 30 minutes)
+      // Alert is active if currently active (between start and end)
       const isCurrentlyActive = (!start || now >= start) && (!end || now <= end);
-      const startsSoon = start && start > now && start <= soonThreshold;
       
-      const isActive = isCurrentlyActive || startsSoon;
-      
-      if (process.env.DEBUG_ALERTS === 'true' && !isActive) {
-        console.log(`[RealMTAService] Alert ${alert.id} filtered out by time: start=${start?.toISOString()}, end=${end?.toISOString()}, now=${now.toISOString()}`);
-      }
-      
-      return isActive;
+      return isCurrentlyActive;
     });
     
-    if (process.env.DEBUG_ALERTS === 'true') {
-      console.log(`[RealMTAService] Filtering active alerts: ${allAlerts.length} total → ${activeAlerts.length} active`);
-    }
     
     return activeAlerts;
   }
 
-  /**
-   * Get upcoming station-skipping alerts (future but within next 7 days)
-   */
-  async getUpcomingStationSkippingAlerts(): Promise<ServiceAlert[]> {
-    const allAlerts = await this.getServiceAlerts();
-    const now = new Date();
-    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    
-    return allAlerts.filter(alert => {
-      // Must be a station-skipping alert
-      if (!this.isStationSkippingAlert(alert)) {
-        return false;
-      }
-      
-      // Check if alert is in the future but within next 7 days
-      if (alert.activePeriod?.start) {
-        return alert.activePeriod.start > now && alert.activePeriod.start <= sevenDaysFromNow;
-      }
-      
-      return false;
-    });
-  }
 
-  /**
-   * Get recently expired station-skipping alerts (expired within last 24 hours)
-   */
-  async getRecentStationSkippingAlerts(): Promise<ServiceAlert[]> {
-    const allAlerts = await this.getServiceAlerts();
-    const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    
-    return allAlerts.filter(alert => {
-      // Must be a station-skipping alert
-      if (!this.isStationSkippingAlert(alert)) {
-        return false;
-      }
-      
-      // Check if alert expired within last 24 hours
-      if (alert.activePeriod?.end) {
-        return alert.activePeriod.end < now && alert.activePeriod.end >= twentyFourHoursAgo;
-      }
-      
-      return false;
-    });
-  }
 
-  /**
-   * Get alerts relevant for a specific time window (in milliseconds)
-   */
-  async getRelevantAlertsForTimeWindow(windowMs: number): Promise<ServiceAlert[]> {
-    const allAlerts = await this.getServiceAlerts();
-    const now = new Date();
-    const windowStart = new Date(now.getTime() - windowMs / 2);
-    const windowEnd = new Date(now.getTime() + windowMs / 2);
-    
-    return allAlerts.filter(alert => {
-      // If no activePeriod, include it (always relevant)
-      if (!alert.activePeriod) {
-        return true;
-      }
-      
-      const { start, end } = alert.activePeriod;
-      
-      // Alert is relevant if it overlaps with our time window
-      const alertStart = start || new Date(0);
-      const alertEnd = end || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year from now if no end
-      
-      return alertStart <= windowEnd && alertEnd >= windowStart;
-    });
-  }
 
-  /**
-   * Get prioritized alerts for commute (station-skipping alerts first, then by severity)
-   */
-  async getPrioritizedAlertsForCommute(lines: string[], direction: 0 | 1): Promise<ServiceAlert[]> {
-    const allAlerts = await this.getActiveServiceAlerts();
-    const timeWindowAlerts = await this.getRelevantAlertsForTimeWindow(4 * 60 * 60 * 1000); // 4 hour window
-    
-    if (process.env.DEBUG_ALERTS === 'true') {
-      console.log(`[RealMTAService] getPrioritizedAlertsForCommute: lines=${lines.join(',')} direction=${direction}`);
-      console.log(`[RealMTAService] Total active alerts: ${allAlerts.length}`);
-      console.log(`[RealMTAService] Time window alerts: ${timeWindowAlerts.length}`);
-    }
-    
-    // Filter by lines and direction
-    const relevantAlerts = allAlerts.filter(alert => {
-      // Must affect at least one of our lines
-      const affectsLines = alert.affectedRoutes.some(route => lines.includes(route));
-      if (!affectsLines) {
-        if (process.env.DEBUG_ALERTS === 'true' && alert.affectedRoutes.length > 0) {
-          console.log(`[RealMTAService] Alert ${alert.id} filtered out: doesn't affect lines ${lines.join(',')} (affects: ${alert.affectedRoutes.join(',')})`);
-        }
-        return false;
-      }
-      
-      // Station-skipping alerts bypass both time window and direction filtering
-      if (this.isStationSkippingAlert(alert)) {
-        if (process.env.DEBUG_ALERTS === 'true') {
-          console.log(`[RealMTAService] Station-skipping alert ${alert.id} PASSED: "${alert.headerText}"`);
-        }
-        return true;
-      }
-      
-      // Regular alerts must be within time window and match direction
-      const inTimeWindow = timeWindowAlerts.some(ta => ta.id === alert.id);
-      if (!inTimeWindow) {
-        if (process.env.DEBUG_ALERTS === 'true') {
-          console.log(`[RealMTAService] Alert ${alert.id} filtered out: not in time window`);
-        }
-        return false;
-      }
-      
-      const directionMatch = alert.informedEntities.some(entity => {
-        if (!entity.routeId || !lines.includes(entity.routeId)) return false;
-        return entity.directionId === undefined || entity.directionId === direction;
-      });
-      
-      if (!directionMatch) {
-        if (process.env.DEBUG_ALERTS === 'true') {
-          console.log(`[RealMTAService] Alert ${alert.id} filtered out: direction mismatch (want: ${direction}, has: ${alert.informedEntities.map(e => e.directionId).join(',')})`);
-        }
-        return false;
-      }
-      
-      if (process.env.DEBUG_ALERTS === 'true') {
-        console.log(`[RealMTAService] Regular alert ${alert.id} PASSED: "${alert.headerText}"`);
-      }
-      
-      return directionMatch;
-    });
-    
-    // Sort by priority: station-skipping first, then by severity
-    const sortedAlerts = relevantAlerts.sort((a, b) => {
-      const aIsStationSkipping = this.isStationSkippingAlert(a);
-      const bIsStationSkipping = this.isStationSkippingAlert(b);
-      
-      if (aIsStationSkipping && !bIsStationSkipping) return -1;
-      if (!aIsStationSkipping && bIsStationSkipping) return 1;
-      
-      // If both are station-skipping or both are regular, sort by severity
-      const severityOrder = { 'severe': 0, 'warning': 1, 'info': 2 };
-      return severityOrder[a.severity] - severityOrder[b.severity];
-    });
-    
-    if (process.env.DEBUG_ALERTS === 'true') {
-      const stationSkippingCount = sortedAlerts.filter(a => this.isStationSkippingAlert(a)).length;
-      const futureCount = allAlerts.length - timeWindowAlerts.length;
-      const ongoingCount = timeWindowAlerts.length - stationSkippingCount;
-      console.log(`[RealMTAService] Alert timing analysis: ${futureCount} future, ${ongoingCount} ongoing, ${stationSkippingCount} station-skipping`);
-    }
-    
-    return sortedAlerts;
-  }
 
   /**
    * Get all stations that could be part of user's possible routes
@@ -2119,9 +1993,6 @@ export class RealMTAService {
       return directionMatch && stationMatch;
     });
     
-    if (process.env.DEBUG_ALERTS === 'true' && isAffected) {
-      console.log(`[RealMTAService] Alert ${alert.id} relevance: affects user route (direction=${direction})`);
-    }
     
     return isAffected;
   }
@@ -2130,29 +2001,6 @@ export class RealMTAService {
    * Check if an alert is about station skipping
    * These alerts are critical and should be shown regardless of direction
    */
-  isStationSkippingAlert(alert: ServiceAlert): boolean {
-    const text = `${alert.headerText} ${alert.descriptionText}`.toLowerCase();
-    const isSkipping = text.includes('skip') || text.includes('not stopping');
-    
-    if (process.env.DEBUG_ALERTS === 'true' && isSkipping) {
-      console.log(`[RealMTAService] Station-skipping alert detected: ${alert.id} - "${alert.headerText}"`);
-    }
-    
-    return isSkipping;
-  }
-
-  /**
-   * Get escalated severity for an alert based on its content
-   */
-  getEscalatedSeverityForAlert(alert: ServiceAlert): 'info' | 'warning' | 'severe' {
-    if (this.isStationSkippingAlert(alert)) {
-      if (process.env.DEBUG_ALERTS === 'true') {
-        console.log(`[RealMTAService] Alert ${alert.id} escalated from ${alert.severity} to severe (station-skipping)`);
-      }
-      return 'severe';
-    }
-    return alert.severity;
-  }
 
   /**
    * Clear all caches

@@ -158,6 +158,39 @@ export function CriticalAlertPill({ alert, isDarkMode }: CriticalAlertPillProps)
     }
   };
 
+  const isSkippingAlert = (alert: ServiceAlert) => {
+    const text = `${alert.headerText} ${alert.descriptionText}`.toLowerCase();
+    return text.includes('skip') || text.includes('not stopping');
+  };
+
+  const getAffectedKeyStations = (alert: ServiceAlert) => {
+    const keyStations = {
+      'F21': 'Carroll St',
+      'A41': 'Jay St-MetroTech',
+      'D18': '23rd St',
+      'A30': '23rd St-8th Ave',
+    };
+
+    const affectedStations: string[] = [];
+    
+    alert.informedEntities.forEach(entity => {
+      if (entity.stopId) {
+        // Check for exact match or directional variants
+        Object.entries(keyStations).forEach(([stationId, stationName]) => {
+          if (entity.stopId === stationId || 
+              entity.stopId === `${stationId}N` || 
+              entity.stopId === `${stationId}S`) {
+            if (!affectedStations.includes(stationName)) {
+              affectedStations.push(stationName);
+            }
+          }
+        });
+      }
+    });
+
+    return affectedStations;
+  };
+
   const toggleExpansion = () => {
     setIsExpanded(!isExpanded);
   };
@@ -213,7 +246,7 @@ export function CriticalAlertPill({ alert, isDarkMode }: CriticalAlertPillProps)
             paddingHorizontal: 6,
             paddingVertical: 2,
             borderRadius: 4,
-            marginRight: 8,
+            marginRight: 6,
           }}>
             <Text style={{
               color: '#FFFFFF',
@@ -223,6 +256,45 @@ export function CriticalAlertPill({ alert, isDarkMode }: CriticalAlertPillProps)
               {getSeverityLabel(alert.severity)}
             </Text>
           </View>
+          
+          {/* Skipping Alert Badge */}
+          {isSkippingAlert(alert) && (
+            <View style={{
+              backgroundColor: '#DC2626', // Red background for critical skipping alerts
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+              borderRadius: 4,
+              marginRight: 6,
+            }}>
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 9,
+                fontWeight: '700',
+              }}>
+                SKIPPING
+              </Text>
+            </View>
+          )}
+          
+          {/* Feed Source Badge */}
+          {alert.feedSource && (
+            <View style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              paddingHorizontal: 5,
+              paddingVertical: 2,
+              borderRadius: 3,
+              marginRight: 8,
+            }}>
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 8,
+                fontWeight: '500',
+                opacity: 0.9,
+              }}>
+                {alert.feedSource}
+              </Text>
+            </View>
+          )}
           
           {/* Alert Header Text */}
           <Text 
@@ -262,6 +334,31 @@ export function CriticalAlertPill({ alert, isDarkMode }: CriticalAlertPillProps)
           }}>
             {alert.descriptionText}
           </Text>
+          
+          {/* Affected Key Stations */}
+          {(() => {
+            const affectedStations = getAffectedKeyStations(alert);
+            return affectedStations.length > 0 ? (
+              <View style={{ marginBottom: 8 }}>
+                <Text style={{ 
+                  color: '#FFFFFF', 
+                  fontSize: 12, 
+                  opacity: 0.8,
+                  marginBottom: 2
+                }}>
+                  Affected Key Stations:
+                </Text>
+                <Text style={{ 
+                  color: '#FFFFFF', 
+                  fontSize: 12, 
+                  opacity: 0.9,
+                  fontWeight: '600'
+                }}>
+                  {affectedStations.join(', ')}
+                </Text>
+              </View>
+            ) : null;
+          })()}
           
           {/* Time in Effect */}
           {(() => {

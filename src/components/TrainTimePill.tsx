@@ -36,9 +36,10 @@ interface TrainTimePillProps {
   line: string;
   time: string;
   index: number;
+  feedSource?: string;
 }
 
-export function TrainTimePill({ line, time, index }: TrainTimePillProps) {
+export function TrainTimePill({ line, time, index, feedSource }: TrainTimePillProps) {
   const lineColors = getLineColors(line);
   
   return (
@@ -47,6 +48,11 @@ export function TrainTimePill({ line, time, index }: TrainTimePillProps) {
       style={[styles.pill, { backgroundColor: lineColors.backgroundColor }]}
     >
       <Text style={[styles.pillText, { color: lineColors.color }]}>{time}</Text>
+      {feedSource && (
+        <Text style={[styles.feedSourceText, { color: lineColors.color }]}>
+          {feedSource}
+        </Text>
+      )}
     </View>
   );
 }
@@ -65,5 +71,11 @@ const styles = StyleSheet.create({
   pillText: {
     fontSize: 12, // Reduced from 14 for iPhone 13 mini
     fontWeight: '600',
+  },
+  feedSourceText: {
+    fontSize: 7,
+    fontWeight: '400',
+    opacity: 0.8,
+    marginTop: 1,
   },
 });

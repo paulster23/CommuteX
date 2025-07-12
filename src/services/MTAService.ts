@@ -1,4 +1,5 @@
 import { StaticLocationProvider, LocationProvider } from './LocationService';
+import { getFeedUrlForLine, getMTAApiKey } from '../config/MTAFeedConfig';
 
 export interface Route {
   id: number;
@@ -19,8 +20,8 @@ export interface GTFSData {
 }
 
 export class MTAService {
-  private readonly MTA_API_KEY = process.env.MTA_API_KEY || 'demo-key';
-  private readonly GTFS_REALTIME_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm';
+  private readonly MTA_API_KEY = getMTAApiKey() || 'demo-key';
+  private readonly GTFS_REALTIME_URL = getFeedUrlForLine('F');
   private readonly locationProvider: LocationProvider;
 
   constructor(locationProvider?: LocationProvider) {

@@ -354,7 +354,15 @@ export function CommuteAppBase({ config }: CommuteAppBaseProps) {
       // Afternoon: Manhattan → Brooklyn = southbound = direction 0
       const direction = config.title.toLowerCase().includes('afternoon') ? 0 : 1;
       
-      const alerts = await mtaService.getServiceAlertsForCommute(['F', 'C', 'A'], direction);
+      // Key stations for your commute routes
+      const keyStations = [
+        'F21', // Carroll St (start)
+        'A41', // Jay St-MetroTech (transfer station)
+        'D18', // 23rd St (F line end)
+        'A30', // 23rd St-8th Ave (C line end)
+      ];
+      
+      const alerts = await mtaService.getServiceAlertsForCommute(['F', 'C', 'A'], direction, keyStations);
       setServiceAlerts(alerts);
     } catch (error) {
       console.error(`[${config.title}] Failed to load service alerts:`, error);

@@ -168,19 +168,58 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
             try {
               const stationLines = nearestStation.lines;
               const directionId = direction === 'northbound' ? 1 : 0;
+              
+              console.log(`[HelpScreen] 🚨 NO DEPARTURES DETECTED for ${nearestStation.name}`);
+              console.log(`[HelpScreen] Station lines: ${stationLines.join(', ')}`);
+              console.log(`[HelpScreen] Direction: ${direction} (directionId: ${directionId})`);
+              
               const allAlerts = await mtaService.getServiceAlertsForCommute(stationLines, directionId);
               
-              const relevantAlerts = allAlerts.filter(alert => {
-                if (alert.severity === 'info') return false;
+              console.log(`[HelpScreen] Raw alerts from getServiceAlertsForCommute: ${allAlerts.length}`);
+              allAlerts.forEach((alert, index) => {
+                console.log(`[HelpScreen] Alert ${index + 1}: "${alert.headerText}" (severity: ${alert.severity}, routes: ${alert.affectedRoutes.join(',')})`);
+                console.log(`[HelpScreen]   Description: "${alert.descriptionText}"`);
+                console.log(`[HelpScreen]   Informed entities: ${JSON.stringify(alert.informedEntities.map(e => ({ routeId: e.routeId, directionId: e.directionId, stopId: e.stopId })))}`);
                 if (alert.activePeriod) {
+                  console.log(`[HelpScreen]   Active period: ${alert.activePeriod.start} to ${alert.activePeriod.end}`);
+                }
+              });
+              
+              const relevantAlerts = allAlerts.filter((alert, index) => {
+                console.log(`[HelpScreen] 🔍 Filtering alert ${index + 1}: "${alert.headerText}"`);
+                
+                // Check if this is a station-skipping alert first
+                const isStationSkipping = mtaService.isStationSkippingAlert(alert);
+                
+                if (alert.severity === 'info' && !isStationSkipping) {
+                  console.log(`[HelpScreen]   ❌ Filtered out: info severity (not station-skipping)`);
+                  return false;
+                }
+                
+                if (isStationSkipping) {
+                  console.log(`[HelpScreen]   ✅ Station-skipping alert - severity filter bypassed`);
+                }
+                
+                if (alert.activePeriod && !isStationSkipping) {
                   const now = new Date();
                   const { start, end } = alert.activePeriod;
-                  if (start && start.getTime() > now.getTime()) return false;
-                  if (end && end.getTime() < now.getTime()) return false;
+                  if (start && start.getTime() > now.getTime()) {
+                    console.log(`[HelpScreen]   ❌ Filtered out: starts in future (${start})`);
+                    return false;
+                  }
+                  if (end && end.getTime() < now.getTime()) {
+                    console.log(`[HelpScreen]   ❌ Filtered out: ended in past (${end})`);
+                    return false;
+                  }
+                } else if (alert.activePeriod && isStationSkipping) {
+                  console.log(`[HelpScreen]   ✅ Station-skipping alert - time filter bypassed`);
                 }
+                
+                console.log(`[HelpScreen]   ✅ Alert passed all filters`);
                 return true;
               });
 
+              console.log(`[HelpScreen] Final relevant alerts: ${relevantAlerts.length}`);
               setAlertState({ alerts: relevantAlerts, loading: false, error: null });
             } catch (error) {
               console.error('Failed to fetch station alerts:', error);
@@ -383,11 +422,22 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
             try {
               const stationLines = locationState.nearestStation!.lines;
               const directionId = direction === 'northbound' ? 1 : 0;
+              
+              console.log(`[HelpScreen Direction] 🚨 NO DEPARTURES for ${locationState.nearestStation!.name}`);
+              console.log(`[HelpScreen Direction] Lines: ${stationLines.join(', ')}, Direction: ${direction} (${directionId})`);
+              
               const allAlerts = await mtaService.getServiceAlertsForCommute(stationLines, directionId);
               
+              console.log(`[HelpScreen Direction] Raw alerts: ${allAlerts.length}`);
+              allAlerts.forEach((alert, index) => {
+                console.log(`[HelpScreen Direction] Alert ${index + 1}: "${alert.headerText}" (${alert.severity}, routes: ${alert.affectedRoutes.join(',')})`);
+              });
+              
               const relevantAlerts = allAlerts.filter(alert => {
-                if (alert.severity === 'info') return false;
-                if (alert.activePeriod) {
+                // Station-skipping alerts bypass severity filtering
+                const isStationSkipping = mtaService.isStationSkippingAlert(alert);
+                if (alert.severity === 'info' && !isStationSkipping) return false;
+                if (alert.activePeriod && !isStationSkipping) {
                   const now = new Date();
                   const { start, end } = alert.activePeriod;
                   if (start && start.getTime() > now.getTime()) return false;
@@ -396,6 +446,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                 return true;
               });
 
+              console.log(`[HelpScreen Direction] Final alerts: ${relevantAlerts.length}`);
               setAlertState({ alerts: relevantAlerts, loading: false, error: null });
             } catch (error) {
               console.error('Failed to fetch station alerts:', error);
@@ -589,6 +640,7 @@ export function HelpScreen({ locationProvider }: HelpScreenProps = {}) {
                       line={line}
                       time={departure.relativeTime}
                       index={index}
+                      feedSource={departure.feedSource}
                     />
                   ))}
                 </View>

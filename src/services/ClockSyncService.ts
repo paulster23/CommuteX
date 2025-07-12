@@ -3,6 +3,8 @@
  * Validates device time accuracy against network time
  */
 
+import { getFeedUrlForLine, getMTAApiHeaders } from '../config/MTAFeedConfig';
+
 export interface TimeValidationResult {
   isAccurate: boolean;
   offsetSeconds: number;
@@ -100,9 +102,10 @@ export class ClockSyncService {
     } catch (error) {
       // Fallback: Try using HTTP Date header from MTA API
       try {
-        const mtaResponse = await fetch('https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace', {
+        const mtaResponse = await fetch(getFeedUrlForLine('A'), {
           method: 'HEAD',
-          cache: 'no-cache'
+          cache: 'no-cache',
+          headers: getMTAApiHeaders()
         });
         
         const mtaDateHeader = mtaResponse.headers.get('date');

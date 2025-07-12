@@ -1,11 +1,13 @@
 import { SubwayStation, StationDatabase } from './StationDatabase';
 import { ConsolidatedStationResult } from './NearestStationService';
+import { getFeedUrlForLine, getMTAApiHeaders } from '../config/MTAFeedConfig';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 
 export interface TrainDeparture {
   line: string;
   departureTime: Date;
   relativeTime: string;
+  feedSource?: string; // Which GTFS feed this data came from
 }
 
 export interface DeparturesByLine {
@@ -21,12 +23,7 @@ interface StopTimeUpdate {
 }
 
 export class StationDepartureService {
-  // GTFS-RT feed URLs (reused from RealMTAService)
-  private static readonly F_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm';
-  private static readonly ACE_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace';
-  private static readonly NQR_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw';
-  private static readonly L_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-l';
-  private static readonly G_TRAIN_FEED_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g';
+  // Feed URLs now managed by centralized configuration
 
   static async getDeparturesForStation(
     station: SubwayStation, 
@@ -54,7 +51,8 @@ export class StationDepartureService {
           .map(update => ({
             line,
             departureTime: new Date(update.departureTime! * 1000),
-            relativeTime: this.formatRelativeTime(new Date(update.departureTime! * 1000), dataFetchTime)
+            relativeTime: this.formatRelativeTime(new Date(update.departureTime! * 1000), dataFetchTime),
+            feedSource: this.getFeedSourceForLine(line)
           }));
 
         departuresByLine[line] = departures;
@@ -94,7 +92,8 @@ export class StationDepartureService {
           .map(update => ({
             line,
             departureTime: new Date(update.departureTime! * 1000),
-            relativeTime: this.formatRelativeTime(new Date(update.departureTime! * 1000), dataFetchTime)
+            relativeTime: this.formatRelativeTime(new Date(update.departureTime! * 1000), dataFetchTime),
+            feedSource: this.getFeedSourceForLine(line)
           }));
 
         departuresByLine[line] = departures;
@@ -163,31 +162,27 @@ export class StationDepartureService {
   }
 
   private static getFeedUrlForLine(line: string): string {
-    // Map train lines to their respective GTFS-RT feeds
-    const feedMap: { [key: string]: string } = {
-      'F': this.F_TRAIN_FEED_URL,
-      'M': this.F_TRAIN_FEED_URL,
-      'B': this.F_TRAIN_FEED_URL,
-      'D': this.F_TRAIN_FEED_URL,
-      'A': this.ACE_TRAIN_FEED_URL,
-      'C': this.ACE_TRAIN_FEED_URL,
-      'E': this.ACE_TRAIN_FEED_URL,
-      'N': this.NQR_TRAIN_FEED_URL,
-      'Q': this.NQR_TRAIN_FEED_URL,
-      'R': this.NQR_TRAIN_FEED_URL,
-      'W': this.NQR_TRAIN_FEED_URL,
-      'L': this.L_TRAIN_FEED_URL,
-      'G': this.G_TRAIN_FEED_URL,
-      '1': this.NQR_TRAIN_FEED_URL, // Using NQR feed as fallback
-      '2': this.NQR_TRAIN_FEED_URL,
-      '3': this.NQR_TRAIN_FEED_URL,
-      '4': this.NQR_TRAIN_FEED_URL,
-      '5': this.NQR_TRAIN_FEED_URL,
-      '6': this.NQR_TRAIN_FEED_URL,
-      '7': this.NQR_TRAIN_FEED_URL,
-    };
+    // Use centralized feed configuration
+    return getFeedUrlForLine(line);
+  }
 
-    return feedMap[line] || this.F_TRAIN_FEED_URL; // Default to F train feed
+  private static getFeedSourceForLine(line: string): string {
+    // Map individual lines to their feed groups for display
+    const lineLower = line.toLowerCase();
+    
+    const lineToFeedMap: { [key: string]: string } = {
+      'b': 'bdfm', 'd': 'bdfm', 'f': 'bdfm', 'm': 'bdfm',
+      'a': 'ace', 'c': 'ace', 'e': 'ace',
+      'n': 'nqrw', 'q': 'nqrw', 'r': 'nqrw', 'w': 'nqrw',
+      'l': 'l',
+      'g': 'g',
+      '1': '123456s', '2': '123456s', '3': '123456s', 
+      '4': '123456s', '5': '123456s', '6': '123456s', 's': '123456s',
+      '7': '7',
+      'j': 'jz', 'z': 'jz'
+    };
+    
+    return lineToFeedMap[lineLower] || 'unknown';
   }
 
   /**
@@ -225,7 +220,8 @@ export class StationDepartureService {
     const urlWithCacheBuster = `${feedUrl}?_=${cacheBuster}`;
     
     const response = await fetch(urlWithCacheBuster, {
-      cache: 'no-cache'
+      cache: 'no-cache',
+      headers: getMTAApiHeaders()
     });
     
     if (!response.ok) {
